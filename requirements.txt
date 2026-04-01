@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+yfinance
+pandas
+numpy
+pydantic
+langchain
+langchain-google-genai
+httpx
+python-dotenv

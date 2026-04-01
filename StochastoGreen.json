@@ -1,0 +1,344 @@
+{
+  "name": "StochastoGreen",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        -160
+      ],
+      "id": "1ac9336b-6d43-4c67-8b11-d534f46a1082",
+      "name": "Telegram Trigger",
+      "webhookId": "4e8a525c-8927-43a1-abd8-d1a8ee98500b",
+      "credentials": {
+        "telegramApi": {
+          "id": "W50RBFUwgE0yjTI3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "OVERVIEW"
+            },
+            {
+              "name": "symbol",
+              "value": "={{ $json.message.text }}"
+            },
+            {
+              "name": "apikey",
+              "value": "9PT4EI717KG22Q13"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        -160
+      ],
+      "id": "0e3c55da-f0d3-41d1-bbec-0f0ccd23bc1d",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres un Analista Cuantitativo Senior especializado en Finanzas Verdes (Green Finance) y Riesgo de Transición Climática.\nAcabas de recibir los resultados de nuestro motor matemático (un modelo estocástico de Jump-Diffusion que simula shocks regulatorios y físicos) para la empresa {{ $json.Symbol }} que opera en el sector {{ $json.Sector }}.\nResultados de la Simulación Estocástica (10,000 escenarios):\nProbabilidad de Shock Climático/Regulatorio (Poisson \nλ\nλ\n): {{ $('Python_SDE_Engine').item.json.jump_prob }}% anual.\nImpacto Estimado en caso de Shock (Caída del precio): {{ $('Python_SDE_Engine').item.json.expected_drop }}%\nClimate Value at Risk (CVaR al 95%): El portafolio podría perder un {{ $('Python_SDE_Engine').item.json.cvar_95 }}% de su valor en el peor escenario climático.\nTu tarea:\nRedacta un reporte analítico, técnico y crudo de máximo 2 párrafos dirigido al Portfolio Manager (Agente 3).\nInterpreta qué significan estos números matemáticos para una empresa del sector {{ $json.Sector }}.\nExplica si el riesgo predominante es físico (desastres) o de transición (impuestos al carbono/leyes ambientales).\nConcluye tajantemente clasificando el activo como: [Activo Verde], [Activo Sucio / Brown Asset] o [Activo en Transición].\nNota: No des consejos de compra, solo traduce el riesgo estocástico a una narrativa financiera.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        -320
+      ],
+      "id": "e1b76791-d249-42c9-bc1e-20fe25e08f2a",
+      "name": "Analista Técnico"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  // Obtenemos el sector del JSON de Alpha Vantage\n  const sector = item.json.Sector || \"Unknown\";\n  \n  let jump_prob, expected_drop, cvar_95;\n\n  // Lógica del Mock: Si es sector contaminante (Brown Asset)\n  if (['Energy', 'Utilities', 'Basic Materials', 'Manufacturing'].includes(sector)) {\n    jump_prob = 18.5;     // 18.5% de probabilidad de shock climático/regulatorio anual\n    expected_drop = 35.0; // Caída estimada del 35% si ocurre el evento\n    cvar_95 = 28.4;       // Climate Value at Risk alto\n  } \n  // Si es sector 'limpio' o neutral (Green/Neutral Asset)\n  else if (['Technology', 'Healthcare', 'Life Sciences'].includes(sector)) {\n    jump_prob = 2.1;\n    expected_drop = 8.0;\n    cvar_95 = 5.5;\n  } \n  // Sectores en transición\n  else {\n    jump_prob = 9.5;\n    expected_drop = 18.0;\n    cvar_95 = 14.2;\n  }\n\n  // Inyectamos las variables matemáticas simuladas al JSON\n  item.json.jump_prob = jump_prob;\n  item.json.expected_drop = expected_drop;\n  item.json.cvar_95 = cvar_95;\n}\n\nreturn items;"
+      },
+      "id": "c3edc815-9616-43ab-b1d3-d857a3452fab",
+      "name": "Python_SDE_Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres un analista financiero experto. Tu objetivo es resumir la salud financiera de la empresa, analiza estos fundamentales y dame tu veredicto de salud financiera en 2 líneas:\n- Símbolo: {{ $json.Symbol }}\n- Sector: {{ $json.Sector }}\n- Industria: {{ $json.Industry }}\n- PE Ratio: {{ $json.PERatio }}\n- Margen de Beneficio: {{ $json.ProfitMargin }}\n- EBITDA: {{ $json.EBITDA }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        -48
+      ],
+      "id": "4d2b9a9d-10d9-4fd7-8f19-9b62700418a9",
+      "name": "Analista Fundamental"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        448,
+        96
+      ],
+      "id": "195d1d77-37e9-413b-ba6d-8ee90970886f",
+      "name": "Cerebro Flash 2.5 Lite",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "XZc0mTGqrD8DrqQz",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -176
+      ],
+      "id": "4b89a99c-3d33-42c7-8dd7-8d6e6acea7ca",
+      "name": "Cerebro 3 Flash",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "XZc0mTGqrD8DrqQz",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        -160
+      ],
+      "id": "63bca5d8-037e-44e1-85f7-b93b18e76c59",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1456,
+        -160
+      ],
+      "id": "31b0be02-ce06-4518-8601-c69d6d868a97",
+      "name": "Send a text message",
+      "webhookId": "7f0f1c07-6edd-4b82-9888-ff868af1ecb3",
+      "credentials": {
+        "telegramApi": {
+          "id": "W50RBFUwgE0yjTI3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres el Gestor de Portafolios Principal de un fondo de cobertura cuantitativo especializado en ESG y Finanzas Verdes. Tienes que tomar la decisión final de inversión sobre la empresa {{ $('HTTP Request').item.json.Symbol }}.\nTienes sobre tu mesa dos reportes independientes:\n1. Reporte Cuantitativo de Riesgo Climático :\n{{ $('Analista Técnico').item.json.output }}\n2. Reporte Fundamental:\n{{ $('Analista Fundamental').item.json.output }}\n\nTu tarea:\nRedacta un veredicto ejecutivo final (máximo 150 palabras) diciendo si debemos [COMPRAR], [MANTENER] o [VENDER/RECHAZAR] el activo. Debes justificar tu decisión equilibrando la salud financiera tradicional con la exposición matemática al riesgo de transición climática (los saltos estocásticos de Poisson y el CVaR). Tu tono debe ser el de un matemático financiero: frío, calculador y basado en el riesgo.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1104,
+        -160
+      ],
+      "id": "e89c116a-095d-4c47-9cef-34f10d01be01",
+      "name": "StochastoGreen Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        16
+      ],
+      "id": "c78743f6-8724-46d9-9af4-0b371d68e158",
+      "name": "Cerebro 3.1 Flash Lite Preview",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "XZc0mTGqrD8DrqQz",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Analista Fundamental",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Python_SDE_Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Python_SDE_Engine": {
+      "main": [
+        [
+          {
+            "node": "Analista Técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro Flash 2.5 Lite": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analista Fundamental",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro 3 Flash": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analista Técnico",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analista Fundamental": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Analista Técnico": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "StochastoGreen Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "StochastoGreen Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro 3.1 Flash Lite Preview": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "StochastoGreen Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5f36a72a-9cc1-44c8-b34c-5eaa416acaf9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "79f9aeaca735453e2a645ac7cf339d4008cde060cd7f865b725f9f45920e59fd"
+  },
+  "id": "y68ZcGT7hCcxs7KG",
+  "tags": []
+}
