@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 # Suppress minor warnings for cleaner output
 warnings.filterwarnings("ignore")
@@ -14,9 +14,41 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "model": "Jump-Diffusion-Euler-Maruyama",
+        "version": "1.0.0"
+    }
+
 class RiskSimulationRequest(BaseModel):
-    ticker: str
-    sector: str
+    ticker: str = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="Stock ticker symbol (e.g. AAPL, XOM, TSLA)"
+    )
+    sector: str = Field(
+        ...,
+        min_length=1,
+        description="Company sector from AlphaVantage OVERVIEW"
+    )
+
+    @field_validator("ticker")
+    @classmethod
+    def normalize_ticker(cls, v: str) -> str:
+        cleaned = v.strip().upper()
+        if not cleaned.replace("-", "").replace(".", "").isalpha():
+            raise ValueError(
+                f"Ticker must contain only letters, got: {cleaned}"
+            )
+        return cleaned
+
+    @field_validator("sector")
+    @classmethod
+    def normalize_sector(cls, v: str) -> str:
+        return v.strip()
 
 def get_climate_beta(sector: str) -> float:
     """
@@ -51,15 +83,15 @@ async def simulate_climate_risk(request: RiskSimulationRequest):
     try:
         # Step 1: Data Ingestion (Last 5 Years)
         # ---------------------------------------------------------------------
-        data = yf.download(ticker, period="5y", interval="1d", progress=False)
+        data = yf.download(
+            ticker, period="5y", interval="1d",
+            progress=False, auto_adjust=True
+        )
         if data.empty:
-            raise ValueError(f"No historical data found for {ticker}")
-            
-        # Ensure correct column parsing with MultiIndex handling (yfinance v0.2.x uses MultiIndex)
-        if isinstance(data.columns, pd.MultiIndex):
-            adj_close = data['Close'][ticker].dropna()
-        else:
-            adj_close = data['Close'].dropna()
+            raise ValueError(f"No historical data found for ticker: {ticker}")
+        adj_close = data['Close'].squeeze().dropna()
+        if adj_close.empty:
+            raise ValueError(f"Price series is empty for ticker: {ticker}")
             
         log_returns = np.log(adj_close / adj_close.shift(1)).dropna()
         
@@ -147,9 +179,16 @@ async def simulate_climate_risk(request: RiskSimulationRequest):
             "cvar_95": round(cvar_95_display, 2)
         }
         
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Simulation failed: {type(e).__name__}: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

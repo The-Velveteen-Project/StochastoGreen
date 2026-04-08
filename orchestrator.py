@@ -1,16 +1,50 @@
 import asyncio
 import os
 import httpx
+import logging
 from dotenv import load_dotenv
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field, field_validator
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 
-# Cargar las variables de entorno
 load_dotenv()
 
-# Nos aseguramos de tener ALPHAVANTAGE_API_KEY y GOOGLE_API_KEY en el environment (.env)
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("stochasto_orchestrator")
+
 ALPHAVANTAGE_API = os.getenv("ALPHAVANTAGE_API_KEY", "demo")
+SDE_ENGINE_URL = os.getenv(
+    "SDE_ENGINE_URL", "http://localhost:8000/simulate_climate_risk"
+)
+
+app = FastAPI(
+    title="StochastoGreen Orchestrator",
+    description="Multi-agent climate transition risk analysis",
+    version="1.0.0",
+)
+
+class AnalysisRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=10)
+    
+    @field_validator("ticker")
+    @classmethod
+    def normalize(cls, v: str) -> str:
+        return v.strip().upper()
+
+class AnalysisResponse(BaseModel):
+    ticker: str
+    fundamental_report: str
+    technical_report: str
+    executive_verdict: str
+    cvar_95: float
+    projected_jump_prob: float
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "orchestrator", "version": "1.0.0"}
 
 async def fetch_alphavantage(symbol: str) -> dict:
     """Trigger y Data Ingestion: Obtiene datos fundamentales desde AlphaVantage."""
@@ -51,7 +85,7 @@ async def run_fundamental_analyst(llm, company_data: dict) -> str:
 
 async def call_python_sde_engine(symbol: str, sector: str) -> dict:
     """Agente Intermediario Cuantitativo: Llama al microservicio microservicio matemático de SDEs (FastAPI)."""
-    url = "http://localhost:8000/simulate_climate_risk"
+    url = SDE_ENGINE_URL
     payload = {"ticker": symbol, "sector": sector}
     try:
         async with httpx.AsyncClient() as client:
@@ -125,57 +159,66 @@ async def run_executive_agent(llm, symbol: str, fundamental_report: str, technic
     })
     return result.content
 
-async def main():
-    """Ejecución de la Red Causal StochastoGreen Multi-Agente"""
-    # Mapeamos los LLMs tal como fue explícito en la topología JSON.
-    # Usaremos modelos soportados si "1.5-flash" reemplaza a "2.5-flash-lite".
+@app.post("/analyze", response_model=AnalysisResponse)
+async def analyze(request: AnalysisRequest) -> AnalysisResponse:
+    ticker = request.ticker
+    log.info(f"Starting analysis for {ticker}")
+
     try:
-        llm_fundamental = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
-        llm_technical = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
-        llm_executive = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5)
+        company_data = await fetch_alphavantage(ticker)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        print(f"Error al inicializar LangChain Google GenAI: {e}\nPor favor asegura haber exportado GOOGLE_API_KEY.")
-        return
+        raise HTTPException(
+            status_code=502,
+            detail=f"AlphaVantage fetch failed: {str(e)}"
+        )
 
-    print(r'''
-    ========================================================
-     [ STOCHASTOGREEN : CLIMATE TRANSITION RISK ORCHESTRATOR ]
-    ========================================================
-    ''')
-    target_ticker = input(">>> Ingresa el Ticker de la empresa a evaluar (Ej: AAPL, XOM, TSLA): ").strip().upper()
-    if not target_ticker:
-        target_ticker = "AAPL"
+    llm_analyst = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", temperature=0.2
+    )
+    llm_executive = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", temperature=0.5
+    )
 
-    print(f"\n[1/4] Iniciando Data Ingestion para {target_ticker} (AlphaVantage)...")
+    # Paralelismo real con create_task
+    fundamental_task = asyncio.create_task(
+        run_fundamental_analyst(llm_analyst, company_data)
+    )
+    technical_task = asyncio.create_task(
+        run_technical_analyst(llm_analyst, company_data)
+    )
+
     try:
-        company_data = await fetch_alphavantage(target_ticker)
-        print(f"      [+] Sector detectado: {company_data.get('Sector', 'Desconocido')} | Industria: {company_data.get('Industry', 'Desconocida')}")
+        fundamental_report, technical_report = await asyncio.gather(
+            fundamental_task, technical_task
+        )
     except Exception as e:
-        print(f"Error en Fetch data: {e}")
-        return
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent analysis failed: {str(e)}"
+        )
 
-    print("\n[2/4] Desplegando ramas de evaluación en PARALELO...")
-    print("      -> Lanzando Agente Fundamental (Salud Tradicional)")
-    print("      -> Lanzando Agente Cuantitativo Tecnico (Evaluación Stochástica y Llamada SDE)")
+    executive_verdict = await run_executive_agent(
+        llm_executive, ticker, fundamental_report, technical_report
+    )
 
-    # Orquestación Concurrente Asíncrona (Aumenta la velocidad drasticamente)
-    fundamental_task = run_fundamental_analyst(llm_fundamental, company_data)
-    await asyncio.sleep(2)
-    technical_task = run_technical_analyst(llm_technical, company_data)
+    sde_data = await call_python_sde_engine(
+        ticker, company_data.get("Sector", "Unknown")
+    )
 
-    fundamental_report, technical_report = await asyncio.gather(fundamental_task, technical_task)
+    log.info(f"Analysis complete for {ticker}")
 
-    print("\n--- [REPORTE FUNDAMENTAL] ---")
-    print(fundamental_report)
-    print("\n--- [REPORTE TÉCNICO / RIESGO ESTOCÁSTICO] ---")
-    print(technical_report)
-
-    print("\n[3/4] Merge: Agente Orquestador procesando veredicto Ejecutivo...")
-    executive_verdict = await run_executive_agent(llm_executive, target_ticker, fundamental_report, technical_report)
-
-    print("\n================== [VEREDICTO FINAL] ==================")
-    print(executive_verdict)
-    print("=========================================================")
+    return AnalysisResponse(
+        ticker=ticker,
+        fundamental_report=fundamental_report,
+        technical_report=technical_report,
+        executive_verdict=executive_verdict,
+        cvar_95=sde_data.get("cvar_95", 0.0),
+        projected_jump_prob=sde_data.get("projected_jump_prob", 0.0),
+    )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import uvicorn
+    port = int(os.getenv("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -8,3 +8,5 @@ langchain
 langchain-google-genai
 httpx
 python-dotenv
+langchain-core
+pydantic-settings

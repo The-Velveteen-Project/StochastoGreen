@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+.git
+*.log
+.pytest_cache
+tests/
+*.ipynb
+StochastoGreen.json
