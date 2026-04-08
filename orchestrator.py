@@ -52,8 +52,14 @@ async def fetch_alphavantage(symbol: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(url, timeout=15.0)
         data = response.json()
+        log.info(f"AlphaVantage response keys for {symbol}: {list(data.keys()) if data else 'empty response'}")
         if not data or "Symbol" not in data:
-            raise ValueError(f"No se encontraron datos para {symbol} en AlphaVantage. Verifica el Ticker o el API Key.")
+            log.error(f"AlphaVantage unexpected response for {symbol}: {data}")
+            raise ValueError(
+                f"AlphaVantage returned no valid data for {symbol}. "
+                f"Response keys: {list(data.keys()) if data else 'empty'}. "
+                f"Possible rate limit or invalid ticker."
+            )
         return data
 
 async def run_fundamental_analyst(llm, company_data: dict) -> str:
