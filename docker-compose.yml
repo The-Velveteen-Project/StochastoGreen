@@ -45,3 +45,15 @@ services:
         limits:
           cpus: '1.0'
           memory: 512m
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    restart: unless-stopped
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ORCHESTRATOR_URL=http://orchestrator:8001/analyze
