@@ -11,3 +11,4 @@ python-dotenv
 langchain-core
 pydantic-settings
 python-telegram-bot==20.7
+google-generativeai
