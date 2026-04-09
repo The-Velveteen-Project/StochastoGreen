@@ -4,11 +4,11 @@ yfinance
 pandas
 numpy
 pydantic
-langchain
-langchain-google-genai
+langchain==0.2.16
+langchain-google-genai==1.0.10
 httpx
 python-dotenv
-langchain-core
+langchain-core==0.2.38
 pydantic-settings
 python-telegram-bot==20.7
 google-generativeai
