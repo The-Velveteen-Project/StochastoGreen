@@ -13,5 +13,5 @@ pydantic-settings
 python-telegram-bot==20.7
 google-generativeai
 supabase==2.3.0
-gotrue==2.3.0
+gotrue==2.4.1
 httpx==0.24.1
