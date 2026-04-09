@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StochastoGreen — Climate Portfolio Risk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   STOCHASTO GREEN — OBSIDIAN OBSERVATORY SYSTEM
+   Accent: Amber (Climate Finance Terminal)
+═══════════════════════════════════════════════ */
+:root {
+  --bg:               #0e0e10;
+  --surface-low:      #131315;
+  --surface-mid:      #1a1a1c;
+  --surface-high:     #222224;
+  --surface-bright:   #2c2c2e;
+  --primary:          #57f1db;
+  --accent:           #f5c347;
+  --accent-dim:       #d4a032;
+  --accent-glow:      rgba(245,195,71,0.12);
+  --accent-subtle:    rgba(245,195,71,0.06);
+  --on-surface:       #e8e4e7;
+  --on-surface-var:   #a89fa8;
+  --outline:          #4a484c;
+  --outline-var:      #2a282c;
+  --success:          #4ade80;
+  --danger:           #ff6b6b;
+  --warn:             #f5c347;
+  --font-display:     'Space Grotesk', sans-serif;
+  --font-body:        'Inter', sans-serif;
+  --font-mono:        'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--on-surface);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ── Ambient ── */
+.ambient {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+}
+.glow-tr {
+  position: absolute; top: -180px; right: -180px;
+  width: 500px; height: 500px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(245,195,71,0.06) 0%, transparent 70%);
+}
+.glow-bl {
+  position: absolute; bottom: -100px; left: -100px;
+  width: 400px; height: 400px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(87,241,219,0.04) 0%, transparent 70%);
+}
+.grid-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(245,195,71,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,195,71,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* ── Layout ── */
+.app { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--surface-low);
+  border-right: 1px solid var(--outline-var);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+.sidebar-brand {
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid var(--outline-var);
+}
+.brand-tag {
+  font-family: var(--font-mono);
+  font-size: 0.58rem; letter-spacing: 0.18em;
+  color: var(--primary); margin-bottom: 0.35rem;
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 700;
+  color: var(--on-surface); line-height: 1.1;
+}
+.brand-name span { color: var(--accent); }
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem; letter-spacing: 0.1em;
+  color: var(--on-surface-var); margin-top: 0.2rem;
+}
+
+.sidebar-nav {
+  flex: 1; padding: 1rem 0; display: flex; flex-direction: column; gap: 0.15rem;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  font-family: var(--font-display); font-size: 0.72rem;
+  font-weight: 600; letter-spacing: 0.08em;
+  color: var(--on-surface-var);
+  cursor: pointer; transition: color 0.2s, background 0.2s;
+  border-left: 2px solid transparent;
+}
+.nav-item:hover { color: var(--on-surface); background: var(--surface-mid); }
+.nav-item.active {
+  color: var(--accent); border-left-color: var(--accent);
+  background: var(--accent-subtle);
+}
+.nav-icon { font-size: 0.8rem; width: 16px; text-align: center; }
+
+.sidebar-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--outline-var);
+}
+.sys-status {
+  font-family: var(--font-mono); font-size: 0.58rem;
+  letter-spacing: 0.1em; color: var(--outline);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.status-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--success);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── Main ── */
+.main {
+  margin-left: 220px; flex: 1;
+  display: flex; flex-direction: column;
+}
+
+/* ── Topbar ── */
+.topbar {
+  height: 56px; padding: 0 2rem;
+  background: rgba(14,14,16,0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--outline-var);
+  display: flex; align-items: center; gap: 1.5rem;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-title {
+  font-family: var(--font-display); font-size: 0.78rem;
+  font-weight: 600; letter-spacing: 0.1em;
+  color: var(--on-surface-var);
+}
+.topbar-sep { width: 1px; height: 18px; background: var(--outline-var); }
+.topbar-path {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--accent); letter-spacing: 0.08em;
+}
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+.topbar-badge {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  letter-spacing: 0.1em; padding: 0.2rem 0.6rem;
+  background: var(--accent-subtle);
+  border: 1px solid rgba(245,195,71,0.2);
+  color: var(--accent);
+}
+.user-chip {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  background: var(--surface-high);
+  border: 1px solid var(--outline-var);
+  cursor: pointer;
+}
+.user-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center;
+  justify-content: center; font-size: 0.55rem;
+  font-weight: 700; color: var(--bg);
+}
+.user-name { font-family: var(--font-display); font-size: 0.68rem; font-weight: 600; }
+
+/* ── Content ── */
+.content { padding: 2rem; flex: 1; }
+
+/* ── Section header ── */
+.section-header {
+  display: flex; align-items: center; gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.section-tag {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  letter-spacing: 0.14em; color: var(--accent);
+  white-space: nowrap;
+}
+.section-line {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--outline-var) 0%, transparent 100%);
+}
+
+/* ── Input panel ── */
+.input-panel {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative; overflow: hidden;
+}
+.input-panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+.input-panel-title {
+  font-family: var(--font-display); font-size: 0.78rem;
+  font-weight: 700; letter-spacing: 0.1em;
+  margin-bottom: 1rem; color: var(--on-surface);
+}
+.input-row {
+  display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;
+}
+.input-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.input-label {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  letter-spacing: 0.12em; color: var(--on-surface-var);
+}
+.ticker-input {
+  background: var(--surface-high);
+  border: 1px solid var(--outline-var);
+  border-bottom: 2px solid var(--outline-var);
+  color: var(--on-surface);
+  font-family: var(--font-mono); font-size: 0.95rem;
+  font-weight: 500; letter-spacing: 0.12em;
+  padding: 0.6rem 1rem;
+  width: 140px; outline: none;
+  text-transform: uppercase;
+  transition: border-color 0.2s, background 0.2s;
+}
+.ticker-input::placeholder { color: var(--outline); font-size: 0.75rem; }
+.ticker-input:focus {
+  border-bottom-color: var(--accent);
+  background: var(--surface-mid);
+}
+.horizon-select {
+  background: var(--surface-high);
+  border: 1px solid var(--outline-var);
+  border-bottom: 2px solid var(--outline-var);
+  color: var(--on-surface);
+  font-family: var(--font-mono); font-size: 0.78rem;
+  padding: 0.6rem 0.85rem;
+  outline: none; cursor: pointer;
+  transition: border-color 0.2s;
+}
+.horizon-select:focus { border-bottom-color: var(--accent); }
+
+.btn-analyze {
+  padding: 0.65rem 1.75rem;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--font-display); font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.12em;
+  border: none; cursor: pointer;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  display: flex; align-items: center; gap: 0.5rem;
+  white-space: nowrap;
+}
+.btn-analyze:hover {
+  background: var(--accent-dim);
+  box-shadow: 0 0 30px rgba(245,195,71,0.2);
+}
+.btn-analyze:active { transform: scale(0.97); }
+.btn-add {
+  padding: 0.65rem 1.25rem;
+  background: transparent;
+  border: 1px solid rgba(245,195,71,0.3);
+  color: var(--accent);
+  font-family: var(--font-display); font-size: 0.72rem;
+  font-weight: 600; letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-add:hover {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+/* ── Portfolio chips ── */
+.portfolio-chips {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  margin-top: 1rem; padding-top: 1rem;
+  border-top: 1px solid var(--outline-var);
+}
+.ticker-chip {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  background: var(--surface-high);
+  border: 1px solid var(--outline-var);
+  font-family: var(--font-mono); font-size: 0.68rem;
+  letter-spacing: 0.1em; color: var(--on-surface-var);
+  cursor: pointer; transition: border-color 0.2s, color 0.2s;
+}
+.ticker-chip:hover { border-color: var(--danger); color: var(--danger); }
+.ticker-chip .chip-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+}
+.chip-dot.green { background: var(--success); }
+.chip-dot.amber { background: var(--accent); }
+.chip-dot.red   { background: var(--danger); }
+
+/* ── KPI cards ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--outline-var);
+  border: 1px solid var(--outline-var);
+  margin-bottom: 1.5rem;
+}
+.kpi-card {
+  background: var(--surface-low);
+  padding: 1.25rem 1.5rem;
+  position: relative; overflow: hidden;
+  transition: background 0.2s;
+}
+.kpi-card:hover { background: var(--surface-mid); }
+.kpi-card.featured { background: var(--surface-mid); }
+.kpi-card.featured::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--accent);
+}
+.kpi-label {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  letter-spacing: 0.14em; color: var(--on-surface-var);
+  margin-bottom: 0.5rem;
+}
+.kpi-value {
+  font-family: var(--font-display); font-size: 1.6rem;
+  font-weight: 700; line-height: 1; color: var(--on-surface);
+}
+.kpi-value.amber { color: var(--accent); }
+.kpi-value.green { color: var(--success); }
+.kpi-value.red   { color: var(--danger); }
+.kpi-delta {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  margin-top: 0.4rem;
+  display: flex; align-items: center; gap: 0.3rem;
+}
+.kpi-delta.up   { color: var(--success); }
+.kpi-delta.down { color: var(--danger); }
+.kpi-sub {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--outline); margin-top: 0.3rem;
+}
+
+/* ── Two-col grid ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+.three-col { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+
+/* ── Panel ── */
+.panel {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  position: relative; overflow: hidden;
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--outline-var);
+}
+.panel-title {
+  font-family: var(--font-display); font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.1em; color: var(--on-surface);
+}
+.panel-tag {
+  font-family: var(--font-mono); font-size: 0.58rem;
+  letter-spacing: 0.1em; color: var(--accent);
+  padding: 0.15rem 0.5rem;
+  background: var(--accent-subtle);
+  border: 1px solid rgba(245,195,71,0.15);
+}
+.panel-body { padding: 1.25rem; }
+
+/* ── Risk bar chart (CSS only) ── */
+.risk-bars { display: flex; flex-direction: column; gap: 0.75rem; }
+.risk-row { display: flex; align-items: center; gap: 0.75rem; }
+.risk-ticker {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  letter-spacing: 0.1em; color: var(--on-surface);
+  width: 48px; flex-shrink: 0;
+}
+.risk-bar-track {
+  flex: 1; height: 6px; background: var(--surface-high);
+  position: relative; overflow: hidden;
+}
+.risk-bar-fill {
+  height: 100%;
+  transition: width 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  animation: barLoad 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes barLoad { from { width: 0; } }
+.risk-bar-fill.low    { background: var(--success); }
+.risk-bar-fill.medium { background: var(--accent); }
+.risk-bar-fill.high   { background: var(--danger); }
+.risk-val {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--on-surface-var); width: 40px; text-align: right;
+}
+
+/* ── Sector distribution ── */
+.sector-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.sector-row { display: flex; align-items: center; gap: 0.75rem; }
+.sector-dot { width: 8px; height: 8px; flex-shrink: 0; }
+.sector-name {
+  font-family: var(--font-body); font-size: 0.78rem;
+  color: var(--on-surface-var); flex: 1;
+}
+.sector-pct {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--on-surface);
+}
+
+/* ── Verdicts ── */
+.verdict-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.verdict-card {
+  padding: 0.85rem 1rem;
+  background: var(--surface-mid);
+  border: 1px solid var(--outline-var);
+  border-left: 3px solid transparent;
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: 0.75rem;
+  transition: border-color 0.2s, background 0.2s;
+  cursor: default;
+}
+.verdict-card:hover { background: var(--surface-high); }
+.verdict-card.buy    { border-left-color: var(--success); }
+.verdict-card.hold   { border-left-color: var(--accent); }
+.verdict-card.sell   { border-left-color: var(--danger); }
+
+.verdict-ticker {
+  font-family: var(--font-mono); font-size: 0.75rem;
+  font-weight: 500; letter-spacing: 0.1em; color: var(--on-surface);
+}
+.verdict-text {
+  font-family: var(--font-body); font-size: 0.75rem;
+  color: var(--on-surface-var); line-height: 1.4;
+}
+.verdict-badge {
+  font-family: var(--font-mono); font-size: 0.58rem;
+  letter-spacing: 0.1em; font-weight: 700;
+  padding: 0.2rem 0.55rem; white-space: nowrap;
+}
+.verdict-badge.buy  { background: rgba(74,222,128,0.12); color: var(--success); }
+.verdict-badge.hold { background: var(--accent-subtle); color: var(--accent); }
+.verdict-badge.sell { background: rgba(255,107,107,0.12); color: var(--danger); }
+
+/* ── Sparkline (SVG placeholder) ── */
+.sparkline-wrap { padding: 0.5rem 0; }
+.sparkline-labels {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 0.58rem;
+  color: var(--outline); margin-top: 0.4rem;
+}
+
+/* ── Monte Carlo visual ── */
+.mc-visual {
+  background: var(--surface-mid);
+  border: 1px solid var(--outline-var);
+  padding: 0; overflow: hidden;
+  position: relative;
+}
+.mc-header {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--outline-var);
+  background: var(--surface-low);
+}
+.mc-dots { display: flex; gap: 5px; }
+.mc-dot { width: 8px; height: 8px; border-radius: 50%; }
+.mc-title {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  letter-spacing: 0.1em; color: var(--outline); flex: 1; text-align: center;
+}
+.mc-canvas { padding: 1rem 1.25rem 0.5rem; }
+.mc-labels {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.5rem 1.25rem 0.85rem;
+}
+.mc-label-item {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--on-surface-var);
+}
+.mc-label-line { width: 16px; height: 2px; }
+
+/* ── History table ── */
+.history-table { width: 100%; border-collapse: collapse; }
+.history-table th {
+  font-family: var(--font-mono); font-size: 0.58rem;
+  letter-spacing: 0.12em; color: var(--outline);
+  padding: 0.5rem 0.75rem; text-align: left;
+  border-bottom: 1px solid var(--outline-var);
+  white-space: nowrap;
+}
+.history-table td {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  padding: 0.6rem 0.75rem; color: var(--on-surface-var);
+  border-bottom: 1px solid var(--outline-var);
+}
+.history-table tr:last-child td { border-bottom: none; }
+.history-table tr:hover td { background: var(--surface-mid); color: var(--on-surface); }
+.td-ticker { color: var(--on-surface); font-weight: 500; letter-spacing: 0.08em; }
+.td-cvar.high  { color: var(--danger); }
+.td-cvar.med   { color: var(--accent); }
+.td-cvar.low   { color: var(--success); }
+
+/* ── Loading overlay ── */
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(14,14,16,0.88);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.loading-overlay.active { opacity: 1; pointer-events: all; }
+.loading-box {
+  background: var(--surface-low);
+  border: 1px solid rgba(245,195,71,0.3);
+  padding: 2rem 2.5rem;
+  display: flex; flex-direction: column; align-items: center; gap: 1.25rem;
+  max-width: 360px; width: 100%;
+}
+.loading-title {
+  font-family: var(--font-display); font-size: 0.85rem;
+  font-weight: 700; letter-spacing: 0.12em; color: var(--on-surface);
+}
+.loading-sub {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--on-surface-var); letter-spacing: 0.08em; text-align: center;
+}
+.loading-bar-track {
+  width: 100%; height: 2px; background: var(--surface-high);
+}
+.loading-bar-fill {
+  height: 100%; background: var(--accent);
+  animation: loadBar 3s ease-in-out infinite;
+}
+@keyframes loadBar {
+  0%   { width: 0; }
+  60%  { width: 80%; }
+  100% { width: 100%; }
+}
+.loading-steps { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
+.loading-step {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  letter-spacing: 0.08em; color: var(--outline);
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.3s;
+}
+.loading-step.done { color: var(--success); }
+.loading-step.active { color: var(--accent); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 300;
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  border-left: 3px solid var(--success);
+  padding: 0.85rem 1.25rem;
+  font-family: var(--font-mono); font-size: 0.68rem;
+  letter-spacing: 0.06em; color: var(--on-surface);
+  transform: translateY(100px); opacity: 0;
+  transition: transform 0.3s, opacity 0.3s;
+  max-width: 320px;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .two-col, .three-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .content { padding: 1rem; }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .input-row { flex-direction: column; align-items: stretch; }
+  .ticker-input, .btn-analyze, .btn-add { width: 100%; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--outline-var); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::selection { background: rgba(245,195,71,0.2); color: var(--on-surface); }
+
+/* ── Reveal ── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.5s, transform 0.5s; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="ambient">
+  <div class="glow-tr"></div>
+  <div class="glow-bl"></div>
+</div>
+<div class="grid-bg"></div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="loading-title">ANALIZANDO PORTAFOLIO</div>
+    <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
+    <div class="loading-steps">
+      <div class="loading-step done" id="step1">✓ DATA INGESTION — ALPHAVANTAGE</div>
+      <div class="loading-step active" id="step2">⟳ JUMP-DIFFUSION SIMULATION — 10K PATHS</div>
+      <div class="loading-step" id="step3">○ AGENTE FUNDAMENTAL</div>
+      <div class="loading-step" id="step4">○ AGENTE CUANTITATIVO</div>
+      <div class="loading-step" id="step5">○ VEREDICTO EJECUTIVO</div>
+    </div>
+    <div class="loading-sub">Esto puede tomar 30–90 segundos.<br>El motor Monte Carlo está corriendo.</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-tag">// THE VELVETEEN PROJECT</div>
+      <div class="brand-name">Stochasto<span>Green</span></div>
+      <div class="brand-sub">CLIMATE RISK TERMINAL v1.0</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="setView('dashboard')">
+        <span class="nav-icon">◈</span> DASHBOARD
+      </div>
+      <div class="nav-item" onclick="setView('portfolio')">
+        <span class="nav-icon">◇</span> PORTAFOLIO
+      </div>
+      <div class="nav-item" onclick="setView('history')">
+        <span class="nav-icon">≡</span> HISTORIAL
+      </div>
+      <div class="nav-item" onclick="setView('alerts')">
+        <span class="nav-icon">△</span> ALERTAS
+        <span style="margin-left:auto;background:var(--danger);color:#fff;font-size:0.5rem;padding:0.1rem 0.35rem;font-family:var(--font-mono)">2</span>
+      </div>
+      <div class="nav-item" style="margin-top:auto" onclick="goToVelveteen()">
+        <span class="nav-icon">←</span> VELVETEEN.AI
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sys-status">
+        <div class="status-dot"></div>
+        SDE_ENGINE · ONLINE
+      </div>
+      <div class="sys-status" style="margin-top:0.4rem">
+        <div class="status-dot" style="background:var(--accent)"></div>
+        ALPHAVANTAGE · 25 REQ/DAY
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title">CLIMATE RISK TERMINAL</div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-path">stochasto.velveteen.app / dashboard</div>
+      <div class="topbar-right">
+        <div class="topbar-badge">MVP · v1.0.0</div>
+        <div class="user-chip">
+          <div class="user-avatar">CM</div>
+          <div class="user-name">Carlos M.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Input panel -->
+      <div class="input-panel reveal" id="inputPanel">
+        <div class="input-panel-title">ANÁLISIS DE RIESGO CLIMÁTICO</div>
+        <div class="input-row">
+          <div class="input-group">
+            <div class="input-label">TICKER</div>
+            <input class="ticker-input" id="tickerInput"
+              placeholder="AAPL" maxlength="10"
+              onkeydown="if(event.key==='Enter') runAnalysis()">
+          </div>
+          <div class="input-group">
+            <div class="input-label">HORIZONTE</div>
+            <select class="horizon-select" id="horizonSelect">
+              <option value="30">30 DÍAS</option>
+              <option value="90">3 MESES</option>
+              <option value="180" selected>6 MESES</option>
+              <option value="365">1 AÑO</option>
+            </select>
+          </div>
+          <button class="btn-analyze" onclick="runAnalysis()">
+            ▶ ANALIZAR
+          </button>
+          <button class="btn-add" onclick="addToPortfolio()">
+            + PORTAFOLIO
+          </button>
+        </div>
+
+        <div class="portfolio-chips" id="portfolioChips">
+          <div class="ticker-chip" onclick="removeTicker('MSFT')">
+            <div class="chip-dot green"></div> MSFT ×
+          </div>
+          <div class="ticker-chip" onclick="removeTicker('XOM')">
+            <div class="chip-dot red"></div> XOM ×
+          </div>
+          <div class="ticker-chip" onclick="removeTicker('TSLA')">
+            <div class="chip-dot amber"></div> TSLA ×
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI grid -->
+      <div class="kpi-grid reveal">
+        <div class="kpi-card featured">
+          <div class="kpi-label">CVAR 95% — PORTAFOLIO</div>
+          <div class="kpi-value amber" id="kpiCvar">22.4%</div>
+          <div class="kpi-delta down">▼ Pérdida esperada en escenario adverso</div>
+          <div class="kpi-sub">PEOR 5% DE 10,000 ESCENARIOS</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">RETORNO ESPERADO — 6M</div>
+          <div class="kpi-value green" id="kpiReturn">+8.3%</div>
+          <div class="kpi-delta up">▲ Percentil 50 — Monte Carlo</div>
+          <div class="kpi-sub">AJUSTADO POR RIESGO CLIMÁTICO</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">PROB. SHOCK CLIMÁTICO</div>
+          <div class="kpi-value" id="kpiJump">9.8%</div>
+          <div class="kpi-delta" style="color:var(--on-surface-var)">Poisson λ — anualizado</div>
+          <div class="kpi-sub">JUMP-DIFFUSION MODEL</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">ACTIVOS ANALIZADOS</div>
+          <div class="kpi-value" id="kpiAssets">3</div>
+          <div class="kpi-delta" style="color:var(--on-surface-var)">MSFT · XOM · TSLA</div>
+          <div class="kpi-sub">PORTAFOLIO ACTIVO</div>
+        </div>
+      </div>
+
+      <!-- Monte Carlo visual + Risk bars -->
+      <div class="three-col">
+        <div class="mc-visual panel reveal">
+          <div class="mc-header">
+            <div class="mc-dots">
+              <div class="mc-dot" style="background:#ff5f57"></div>
+              <div class="mc-dot" style="background:#ffbd2e"></div>
+              <div class="mc-dot" style="background:#28ca41"></div>
+            </div>
+            <div class="mc-title">monte_carlo_simulation.py · 10,000 paths · Jump-Diffusion</div>
+          </div>
+          <div class="mc-canvas">
+            <svg width="100%" viewBox="0 0 480 180" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="pathGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f5c347" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="#f5c347" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <!-- Grid lines -->
+              <line x1="0" y1="45" x2="480" y2="45" stroke="#2a282c" stroke-width="1"/>
+              <line x1="0" y1="90" x2="480" y2="90" stroke="#2a282c" stroke-width="1"/>
+              <line x1="0" y1="135" x2="480" y2="135" stroke="#2a282c" stroke-width="1"/>
+              <!-- Simulation paths (faint) -->
+              <path d="M0,90 C40,85 80,70 120,75 C160,80 200,65 240,60 C280,55 320,70 360,65 C400,60 440,55 480,50" fill="none" stroke="#f5c347" stroke-width="0.4" opacity="0.3"/>
+              <path d="M0,90 C40,95 80,105 120,115 C160,125 200,130 240,120 C280,110 320,115 360,125 C400,135 440,140 480,145" fill="none" stroke="#ff6b6b" stroke-width="0.4" opacity="0.3"/>
+              <path d="M0,90 C40,88 80,75 120,70 C160,65 200,55 240,50 C280,45 320,48 360,42 C400,36 440,32 480,28" fill="none" stroke="#4ade80" stroke-width="0.4" opacity="0.3"/>
+              <path d="M0,90 C40,92 80,88 120,95 C160,100 200,95 240,90 C280,85 320,88 360,82 C400,76 440,70 480,68" fill="none" stroke="#f5c347" stroke-width="0.4" opacity="0.3"/>
+              <path d="M0,90 C40,86 80,80 120,82 C160,84 200,78 240,72 C280,66 320,75 360,70 C400,65 440,62 480,58" fill="none" stroke="#a78bfa" stroke-width="0.4" opacity="0.2"/>
+              <!-- CVaR zone -->
+              <path d="M0,125 C40,130 80,138 120,142 C160,146 200,150 240,152 C280,154 320,152 360,155 C400,158 440,160 480,162 L480,180 L0,180 Z" fill="rgba(255,107,107,0.08)"/>
+              <!-- Median path -->
+              <path d="M0,90 C40,87 80,80 120,78 C160,76 200,72 240,68 C280,64 320,68 360,64 C400,60 440,56 480,54" fill="none" stroke="#f5c347" stroke-width="1.5" opacity="0.9"/>
+              <!-- Jump event marker -->
+              <line x1="240" y1="20" x2="240" y2="160" stroke="rgba(255,107,107,0.4)" stroke-width="1" stroke-dasharray="3,3"/>
+              <circle cx="240" cy="68" r="4" fill="#ff6b6b" opacity="0.8"/>
+              <text x="244" y="30" fill="#ff6b6b" font-size="8" font-family="JetBrains Mono" opacity="0.7">SHOCK</text>
+              <!-- VaR line -->
+              <line x1="0" y1="142" x2="480" y2="142" stroke="rgba(245,195,71,0.4)" stroke-width="1" stroke-dasharray="4,4"/>
+              <text x="4" y="138" fill="#f5c347" font-size="7" font-family="JetBrains Mono" opacity="0.7">VaR 95%</text>
+            </svg>
+          </div>
+          <div class="mc-labels">
+            <div class="mc-label-item">
+              <div class="mc-label-line" style="background:var(--accent)"></div>
+              Trayectoria media
+            </div>
+            <div class="mc-label-item">
+              <div class="mc-label-line" style="background:var(--danger)"></div>
+              Zona CVaR (peor 5%)
+            </div>
+            <div class="mc-label-item">
+              <div class="mc-label-line" style="background:var(--success)"></div>
+              Escenario optimista
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem">
+          <!-- Risk per ticker -->
+          <div class="panel reveal">
+            <div class="panel-header">
+              <div class="panel-title">CVAR POR ACTIVO</div>
+              <div class="panel-tag">95% ES</div>
+            </div>
+            <div class="panel-body">
+              <div class="risk-bars">
+                <div class="risk-row">
+                  <div class="risk-ticker">MSFT</div>
+                  <div class="risk-bar-track">
+                    <div class="risk-bar-fill low" style="width:18%"></div>
+                  </div>
+                  <div class="risk-val" style="color:var(--success)">5.5%</div>
+                </div>
+                <div class="risk-row">
+                  <div class="risk-ticker">TSLA</div>
+                  <div class="risk-bar-track">
+                    <div class="risk-bar-fill medium" style="width:55%"></div>
+                  </div>
+                  <div class="risk-val" style="color:var(--accent)">14.2%</div>
+                </div>
+                <div class="risk-row">
+                  <div class="risk-ticker">XOM</div>
+                  <div class="risk-bar-track">
+                    <div class="risk-bar-fill high" style="width:88%"></div>
+                  </div>
+                  <div class="risk-val" style="color:var(--danger)">28.4%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sector dist -->
+          <div class="panel reveal">
+            <div class="panel-header">
+              <div class="panel-title">CLASIFICACIÓN ESG</div>
+              <div class="panel-tag">CLIMATE BETA</div>
+            </div>
+            <div class="panel-body">
+              <div class="sector-list">
+                <div class="sector-row">
+                  <div class="sector-dot" style="background:var(--success)"></div>
+                  <div class="sector-name">Activos Verdes</div>
+                  <div class="sector-pct">33%</div>
+                </div>
+                <div class="sector-row">
+                  <div class="sector-dot" style="background:var(--accent)"></div>
+                  <div class="sector-name">En Transición</div>
+                  <div class="sector-pct">33%</div>
+                </div>
+                <div class="sector-row">
+                  <div class="sector-dot" style="background:var(--danger)"></div>
+                  <div class="sector-name">Brown Assets</div>
+                  <div class="sector-pct">33%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verdicts + History -->
+      <div class="two-col">
+        <div class="panel reveal">
+          <div class="panel-header">
+            <div class="panel-title">VEREDICTOS EJECUTIVOS</div>
+            <div class="panel-tag">AGENTE IA</div>
+          </div>
+          <div class="panel-body">
+            <div class="verdict-list">
+              <div class="verdict-card buy">
+                <div class="verdict-ticker">MSFT</div>
+                <div class="verdict-text">Salud financiera sólida. Exposición climática mínima. CVaR controlado en 5.5%.</div>
+                <div class="verdict-badge buy">COMPRAR</div>
+              </div>
+              <div class="verdict-card hold">
+                <div class="verdict-ticker">TSLA</div>
+                <div class="verdict-text">Activo en transición. Volatilidad elevada compensa parcialmente el riesgo regulatorio.</div>
+                <div class="verdict-badge hold">MANTENER</div>
+              </div>
+              <div class="verdict-card sell">
+                <div class="verdict-ticker">XOM</div>
+                <div class="verdict-text">Brown Asset. CVaR 28.4%. Alta exposición regulatoria. Riesgo de transición severo.</div>
+                <div class="verdict-badge sell">VENDER</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History table -->
+        <div class="panel reveal">
+          <div class="panel-header">
+            <div class="panel-title">HISTORIAL DE ANÁLISIS</div>
+            <div class="panel-tag">SUPABASE</div>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th>FECHA</th>
+                  <th>CVAR 95%</th>
+                  <th>VEREDICTO</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="td-ticker">XOM</td>
+                  <td>2026-04-08</td>
+                  <td class="td-cvar high">28.4%</td>
+                  <td><span class="verdict-badge sell">VENDER</span></td>
+                </tr>
+                <tr>
+                  <td class="td-ticker">MSFT</td>
+                  <td>2026-04-08</td>
+                  <td class="td-cvar low">5.5%</td>
+                  <td><span class="verdict-badge buy">COMPRAR</span></td>
+                </tr>
+                <tr>
+                  <td class="td-ticker">TSLA</td>
+                  <td>2026-04-07</td>
+                  <td class="td-cvar med">14.2%</td>
+                  <td><span class="verdict-badge hold">MANTENER</span></td>
+                </tr>
+                <tr>
+                  <td class="td-ticker">AAPL</td>
+                  <td>2026-04-06</td>
+                  <td class="td-cvar low">7.8%</td>
+                  <td><span class="verdict-badge buy">COMPRAR</span></td>
+                </tr>
+                <tr>
+                  <td class="td-ticker">BP</td>
+                  <td>2026-04-05</td>
+                  <td class="td-cvar high">31.2%</td>
+                  <td><span class="verdict-badge sell">VENDER</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// ── Portfolio state ──
+const portfolio = ['MSFT', 'XOM', 'TSLA'];
+const ORCHESTRATOR_URL = 'https://orchestator-production.up.railway.app';
+
+function setView(v) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  event.target.closest('.nav-item').classList.add('active');
+}
+
+function goToVelveteen() {
+  window.open('https://cmorregof.github.io/velveteen/', '_blank');
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderLeftColor = type === 'error'
+    ? 'var(--danger)' : type === 'warn'
+    ? 'var(--accent)' : 'var(--success)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+function renderChips() {
+  const colors = { MSFT: 'green', TSLA: 'amber', XOM: 'red' };
+  const wrap = document.getElementById('portfolioChips');
+  wrap.innerHTML = portfolio.map(t => `
+    <div class="ticker-chip" onclick="removeTicker('${t}')">
+      <div class="chip-dot ${colors[t] || 'amber'}"></div> ${t} ×
+    </div>
+  `).join('');
+}
+
+function removeTicker(t) {
+  const i = portfolio.indexOf(t);
+  if (i > -1) { portfolio.splice(i, 1); renderChips(); }
+  document.getElementById('kpiAssets').textContent = portfolio.length;
+  showToast(`${t} eliminado del portafolio`, 'warn');
+}
+
+function addToPortfolio() {
+  const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (!ticker) { showToast('Ingresa un ticker primero', 'warn'); return; }
+  if (portfolio.includes(ticker)) { showToast(`${ticker} ya está en el portafolio`, 'warn'); return; }
+  if (portfolio.length >= 10) { showToast('Máximo 10 activos por portafolio', 'error'); return; }
+  portfolio.push(ticker);
+  renderChips();
+  document.getElementById('kpiAssets').textContent = portfolio.length;
+  showToast(`${ticker} agregado al portafolio`);
+}
+
+async function runAnalysis() {
+  const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (!ticker) { showToast('Ingresa un ticker para analizar', 'warn'); return; }
+
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('active');
+
+  // Animate steps
+  const steps = ['step1','step2','step3','step4','step5'];
+  steps.forEach((s,i) => {
+    const el = document.getElementById(s);
+    el.className = 'loading-step';
+    setTimeout(() => {
+      el.classList.add('active');
+      setTimeout(() => el.classList.add('done'), 800);
+    }, i * 1200);
+  });
+
+  try {
+    const res = await fetch(`${ORCHESTRATOR_URL}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || 'Error en el análisis');
+    }
+
+    // Update KPIs with real data
+    document.getElementById('kpiCvar').textContent = data.cvar_95.toFixed(1) + '%';
+    document.getElementById('kpiJump').textContent = data.projected_jump_prob.toFixed(1) + '%';
+
+    // Update verdict (simplified)
+    showToast(`Análisis de ${ticker} completado`);
+
+  } catch (err) {
+    showToast(err.message || 'Error conectando con el servidor', 'error');
+  } finally {
+    setTimeout(() => overlay.classList.remove('active'), 500);
+  }
+}
+
+// ── Reveal on scroll ──
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Init
+renderChips();
+</script>
+</body>
+</html>
