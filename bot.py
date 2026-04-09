@@ -253,13 +253,17 @@ async def help_command(
         "el mejor portafolio para tu perfil."
     )
 
+async def post_init(application: Application) -> None:
+    await application.bot.delete_webhook(drop_pending_updates=True)
+    log.info("Webhook residual eliminado y actualizaciones pendientes descartadas")
+
 def main():
     if not TOKEN:
         raise ValueError(
             "TELEGRAM_BOT_TOKEN no configurado"
         )
 
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(
