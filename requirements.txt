@@ -12,3 +12,4 @@ langchain-core==0.2.38
 pydantic-settings
 python-telegram-bot==20.7
 google-generativeai
+supabase

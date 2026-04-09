@@ -1,12 +1,11 @@
-"use client";
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
   ComposedChart, Bar, Cell
 } from 'recharts';
 import { TrendingDown, TrendingUp, AlertTriangle, Layers, Info } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // --- MOCK DATA ---
 const SIMULATION_DATA = Array.from({ length: 50 }, (_, i) => ({
@@ -30,6 +29,42 @@ const ESG_DATA = [
 ];
 
 export default function Dashboard() {
+  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAnalyses() {
+      const { data, error } = await supabase
+        .from('risk_analyses')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setAnalyses(data);
+      }
+      setLoading(false);
+    }
+    fetchAnalyses();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, (payload) => {
+        setAnalyses((prev) => [payload.new, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const lastAnalysis = analyses[0] || {};
+  
+  // Calculate aggregate stats or use last
+  const portfolioCVar = lastAnalysis.cvar_95 ? `${lastAnalysis.cvar_95}%` : "0.0%";
+  const probShock = lastAnalysis.jump_prob ? `${lastAnalysis.jump_prob}%` : "0.0%";
+
   return (
     <div className="space-y-6">
       <section className="flex items-center gap-4">
@@ -42,10 +77,10 @@ export default function Dashboard() {
       {/* KPI Grid */}
       <div className="kpi-grid">
         <KPICard 
-          label="CVAR 95% — PORTAFOLIO" 
-          value="22.4%" 
+          label="CVAR 95% — ÚLTIMO ANÁLISIS" 
+          value={portfolioCVar} 
           color="text-primary" 
-          delta="▼ Riesgo climático concentrado" 
+          delta={lastAnalysis.ticker || "Pendiente"} 
           sub="PEOR 5% ESCENARIOS"
           featured
         />
@@ -58,17 +93,17 @@ export default function Dashboard() {
         />
         <KPICard 
           label="PROB. SHOCK CLIMÁTICO" 
-          value="9.8%" 
+          value={probShock} 
           color="text-obsidian-on" 
           delta="Poisson λ — anual" 
           sub="JUMP-DIFFUSION MODEL"
         />
         <KPICard 
           label="ACTIVOS ANALIZADOS" 
-          value="3" 
+          value={analyses.length.toString()} 
           color="text-obsidian-on" 
-          delta="MSFT · XOM · TSLA" 
-          sub="PORTAFOLIO ACTIVO"
+          delta={analyses.slice(0, 3).map(a => a.ticker).join(' · ')} 
+          sub="HISTORIAL ACTIVO"
         />
       </div>
 
@@ -163,9 +198,20 @@ export default function Dashboard() {
               <span className="text-[0.58rem] font-mono text-primary">AGENTE IA</span>
             </div>
             <div className="p-4 space-y-3">
-              <VerdictCard ticker="MSFT" action="COMPRAR" color="success" text="Salud financiera sólida. Exposición climática mínima. CVaR controlado en 5.5%." />
-              <VerdictCard ticker="TSLA" action="MANTENER" color="primary" text="Activo en transición. Volatilidad elevada compensa parcialmente el riesgo." />
-              <VerdictCard ticker="XOM" action="VENDER" color="danger" text="Brown Asset. CVaR 28.4%. Alta exposición regulatoria y riesgo de transición." />
+              {analyses.slice(0, 3).map((a, i) => (
+                <VerdictCard 
+                  key={i}
+                  ticker={a.ticker} 
+                  action={a.verdict?.includes('COMPRAR') ? 'COMPRAR' : a.verdict?.includes('VENDER') ? 'VENDER' : 'MANTENER'} 
+                  color={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'} 
+                  text={a.verdict?.split('.')[0] + '.'} 
+                />
+              ))}
+              {analyses.length === 0 && (
+                <div className="text-center py-8 text-obsidian-on-var font-mono text-xs opacity-50">
+                  Esperando análisis del Bot...
+                </div>
+              )}
             </div>
         </div>
 
@@ -185,9 +231,16 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-obsidian-outline-var/30">
-                  <HistoryRow ticker="XOM" date="2026-04-08" cvar="28.4%" type="danger" verdict="VENDER" />
-                  <HistoryRow ticker="MSFT" date="2026-04-08" cvar="5.5%" type="success" verdict="COMPRAR" />
-                  <HistoryRow ticker="TSLA" date="2026-04-07" cvar="14.2%" type="primary" verdict="MANTENER" />
+                  {analyses.map((a, i) => (
+                    <HistoryRow 
+                      key={i}
+                      ticker={a.ticker} 
+                      date={a.created_at ? new Date(a.created_at).toLocaleDateString() : 'N/A'} 
+                      cvar={`${a.cvar_95}%`} 
+                      type={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'} 
+                      verdict={a.verdict?.match(/\[(.*?)\]/)?.[1] || 'ANALIZADO'} 
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>

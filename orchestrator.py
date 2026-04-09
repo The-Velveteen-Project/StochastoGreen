@@ -3,6 +3,7 @@ import os
 import httpx
 import logging
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -19,6 +20,11 @@ ALPHAVANTAGE_API = os.getenv("ALPHAVANTAGE_API_KEY", "demo")
 SDE_ENGINE_URL = os.getenv(
     "SDE_ENGINE_URL", "http://localhost:8000/simulate_climate_risk"
 )
+
+# Supabase Configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project-url.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "your-service-role-key")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(
     title="StochastoGreen Orchestrator",
@@ -215,7 +221,7 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
 
     log.info(f"Analysis complete for {ticker}")
 
-    return AnalysisResponse(
+    response = AnalysisResponse(
         ticker=ticker,
         fundamental_report=fundamental_report,
         technical_report=technical_report,
@@ -223,6 +229,23 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
         cvar_95=sde_data.get("cvar_95", 0.0),
         projected_jump_prob=sde_data.get("projected_jump_prob", 0.0),
     )
+
+    # Persist to Supabase
+    try:
+        data_to_save = {
+            "ticker": response.ticker,
+            "cvar_95": response.cvar_95,
+            "jump_prob": response.projected_jump_prob,
+            "verdict": response.executive_verdict,
+            "fundamental_report": response.fundamental_report,
+            "technical_report": response.technical_report
+        }
+        supabase.table("risk_analyses").insert(data_to_save).execute()
+        log.info(f"Saved analysis for {ticker} to Supabase")
+    except Exception as e:
+        log.error(f"Failed to save to Supabase: {e}")
+
+    return response
 
 if __name__ == "__main__":
     import uvicorn
