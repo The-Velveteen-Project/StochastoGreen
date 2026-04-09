@@ -9,6 +9,7 @@ from telegram.ext import (
     Application, CommandHandler,
     MessageHandler, filters, ContextTypes
 )
+from telegram.error import Conflict
 import google.generativeai as genai
 
 load_dotenv()
@@ -255,7 +256,10 @@ async def help_command(
 
 async def post_init(application: Application) -> None:
     await application.bot.delete_webhook(drop_pending_updates=True)
-    log.info("Webhook residual eliminado y actualizaciones pendientes descartadas")
+    log.info("Webhook residual eliminado. Esperando 2s para sincronización con Railway...")
+    # Delay to allow previous instance to shut down
+    await asyncio.sleep(2)
+    log.info("Iniciando polling...")
 
 def main():
     if not TOKEN:
@@ -274,7 +278,20 @@ def main():
     )
 
     log.info("StochastoGreen agent iniciado")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+            break
+        except Conflict:
+            if attempt < max_retries - 1:
+                log.warning(f"Conflicto 409 detectado. Reintento {attempt + 2}/{max_retries} en 5s...")
+                import time
+                time.sleep(5)
+            else:
+                log.error("Máximo de reintentos alcanzado. Abortando.")
+                raise
 
 if __name__ == "__main__":
     main()
