@@ -6,12 +6,9 @@ numpy
 pydantic
 langchain==0.2.16
 langchain-google-genai==1.0.10
-httpx
 python-dotenv
 langchain-core==0.2.38
 pydantic-settings
 google-generativeai
-httpx==0.24.1
-# Remove the explicit gotrue and httpx pins entirely — let pip resolve them
 supabase==2.9.0
 python-telegram-bot==21.3
