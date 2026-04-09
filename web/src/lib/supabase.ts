@@ -48,3 +48,4 @@ export type TelegramLinkCode = {
   expires_at: string
   used: boolean
 }
+export const supabase = createClient()
