@@ -10,10 +10,7 @@ httpx
 python-dotenv
 langchain-core==0.2.38
 pydantic-settings
-
 google-generativeai
-
-gotrue==2.4.1
 httpx==0.24.1
 # Remove the explicit gotrue and httpx pins entirely — let pip resolve them
 supabase==2.9.0
