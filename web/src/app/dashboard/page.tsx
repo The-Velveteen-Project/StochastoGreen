@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { createClient } from '@/lib/supabase';
@@ -14,18 +14,33 @@ function gaussianRandom() {
   return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
 }
 
-function buildSimulationData() {
+function buildSimulationData(mu = 0.10, sigma = 0.25, lambda = 0.09, jumpMag = -0.12) {
+  const steps = 252;
+  const dt = 1 / steps;
+  const sqrtDt = Math.sqrt(dt);
+
+  function path(zBias: 'normal' | 'positive' | 'negative', forceJumps = false): number[] {
+    let lnS = 0;
+    const out = [1];
+    for (let i = 1; i <= steps; i++) {
+      const z = zBias === 'positive' ? Math.abs(gaussianRandom())
+              : zBias === 'negative' ? -Math.abs(gaussianRandom())
+              : gaussianRandom();
+      const dN = (forceJumps && i % 11 === 0) ? 1 : (Math.random() < lambda * dt ? 1 : 0);
+      const J = dN ? jumpMag + sigma * 0.5 * gaussianRandom() : 0;
+      lnS += (mu - 0.5 * sigma * sigma) * dt + sigma * z * sqrtDt + J;
+      out.push(Math.exp(lnS));
+    }
+    return out;
+  }
+
+  const mediaPath = path('normal');
+  const p95Path   = path('positive');
+  const p5Path    = path('negative', true);
+
   return Array.from({ length: 50 }, (_, i) => {
-    const timeFactor = i / 50;
-    const media = 1 * Math.exp((0.08 - 0.5 * 0.25 * 0.25) * timeFactor + 0.25 * Math.sqrt(timeFactor) * gaussianRandom());
-    const cvar = media * (0.85 + Math.random() * 0.1);
-    return {
-      t: i,
-      media,
-      cvar,
-      p5: cvar,
-      p95: media * (1.1 + Math.random() * 0.08),
-    };
+    const idx = Math.round((i / 49) * steps);
+    return { t: i, media: mediaPath[idx], p95: p95Path[idx], p5: p5Path[idx], cvar: p5Path[idx] };
   });
 }
 
@@ -35,7 +50,11 @@ export default function Dashboard() {
   const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
   const [tickerRisk, setTickerRisk] = useState<any[]>([]);
   const [uniqueTickerCount, setUniqueTickerCount] = useState(0);
-  const [simulationData] = useState(buildSimulationData);
+  const simulationData = useMemo(() => {
+    const lambda  = latestAnalysis?.jump_prob ? latestAnalysis.jump_prob / 100 : 0.09;
+    const jumpMag = latestAnalysis?.cvar_95   ? -(latestAnalysis.cvar_95 / 100) * 0.3 : -0.12;
+    return buildSimulationData(0.10, 0.25, lambda, jumpMag);
+  }, [latestAnalysis]);
   const [loading, setLoading] = useState(true);
 
   async function loadDashboard() {
