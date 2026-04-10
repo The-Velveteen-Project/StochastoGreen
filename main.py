@@ -170,13 +170,24 @@ async def simulate_climate_risk(request: RiskSimulationRequest):
         cvar_95_display = abs(cvar_95) if cvar_95 < 0 else 0.0
         expected_drop_pct = (np.exp(mu_J_future) - 1) * 100
         prob_shock_annual = (1 - np.exp(-lambda_future)) * 100
-        
+
+        # Step 6: Simulation Paths — 3 representative percentiles, resampled to 50 points
+        # S[:, 5::5] → indices 5,10,...,250 → exactly 50 points
+        S_sampled = S[:, 5::5]
+        S_norm = S_sampled / S[:, 0].mean() * 100  # index to 100
+        simulation_paths = {
+            "media":     [round(float(v), 2) for v in np.percentile(S_norm, 50, axis=0)],
+            "optimista": [round(float(v), 2) for v in np.percentile(S_norm, 90, axis=0)],
+            "cvar_zone": [round(float(v), 2) for v in np.percentile(S_norm,  5, axis=0)],
+        }
+
         return {
             "ticker": ticker,
             "historical_volatility": round(sigma_hist, 4),
             "projected_jump_prob": round(prob_shock_annual, 2),
             "projected_expected_drop": round(expected_drop_pct, 2),
-            "cvar_95": round(cvar_95_display, 2)
+            "cvar_95": round(cvar_95_display, 2),
+            "simulation_paths": simulation_paths,
         }
         
     except ValueError as e:

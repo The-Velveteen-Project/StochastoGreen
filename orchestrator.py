@@ -265,7 +265,8 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
             "jump_prob": response.projected_jump_prob,
             "verdict": response.executive_verdict,
             "fundamental_report": response.fundamental_report,
-            "technical_report": response.technical_report
+            "technical_report": response.technical_report,
+            "simulation_paths": sde_data.get("simulation_paths"),
         }
         supabase.table("risk_analyses").insert(data_to_save).execute()
         log.info(f"Saved analysis for {ticker} to Supabase")

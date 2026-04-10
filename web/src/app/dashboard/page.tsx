@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { createClient } from '@/lib/supabase';
@@ -10,39 +10,6 @@ const ESG_DATA = [
   { name: 'Brown Assets', value: 33, color: '#ff6b6b' },
 ];
 
-function gaussianRandom() {
-  return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
-}
-
-function buildSimulationData(mu = 0.10, sigma = 0.25, lambda = 0.09, jumpMag = -0.12) {
-  const steps = 252;
-  const dt = 1 / steps;
-  const sqrtDt = Math.sqrt(dt);
-
-  function path(zBias: 'normal' | 'positive' | 'negative', forceJumps = false): number[] {
-    let lnS = 0;
-    const out = [1];
-    for (let i = 1; i <= steps; i++) {
-      const z = zBias === 'positive' ? Math.abs(gaussianRandom())
-              : zBias === 'negative' ? -Math.abs(gaussianRandom())
-              : gaussianRandom();
-      const dN = (forceJumps && i % 11 === 0) ? 1 : (Math.random() < lambda * dt ? 1 : 0);
-      const J = dN ? jumpMag + sigma * 0.5 * gaussianRandom() : 0;
-      lnS += (mu - 0.5 * sigma * sigma) * dt + sigma * z * sqrtDt + J;
-      out.push(Math.exp(lnS));
-    }
-    return out;
-  }
-
-  const mediaPath = path('normal');
-  const p95Path   = path('positive');
-  const p5Path    = path('negative', true);
-
-  return Array.from({ length: 50 }, (_, i) => {
-    const idx = Math.round((i / 49) * steps);
-    return { t: i, media: mediaPath[idx], p95: p95Path[idx], p5: p5Path[idx], cvar: p5Path[idx] };
-  });
-}
 
 export default function Dashboard() {
   const supabase = createClient();
@@ -50,11 +17,7 @@ export default function Dashboard() {
   const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
   const [tickerRisk, setTickerRisk] = useState<any[]>([]);
   const [uniqueTickerCount, setUniqueTickerCount] = useState(0);
-  const simulationData = useMemo(() => {
-    const lambda  = latestAnalysis?.jump_prob ? latestAnalysis.jump_prob / 100 : 0.09;
-    const jumpMag = latestAnalysis?.cvar_95   ? -(latestAnalysis.cvar_95 / 100) * 0.3 : -0.12;
-    return buildSimulationData(0.10, 0.25, lambda, jumpMag);
-  }, [latestAnalysis]);
+  const [simulationData, setSimulationData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function loadDashboard() {
@@ -106,6 +69,14 @@ export default function Dashboard() {
     });
 
     setLatestAnalysis(latestRows?.[0] ?? null);
+    const paths = latestRows?.[0]?.simulation_paths;
+    if (paths?.media) {
+      setSimulationData(paths.media.map((val: number, i: number) => ({
+        t: i, media: val, p95: paths.optimista[i], p5: paths.cvar_zone[i], cvar: paths.cvar_zone[i],
+      })));
+    } else {
+      setSimulationData([]);
+    }
     setAnalyses(allAnalyses ?? []);
     setTickerRisk(tickerRiskRows);
     setUniqueTickerCount(tickerRiskRows.length);
@@ -175,23 +146,29 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="h-[300px] w-full p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={simulationData}>
-                <defs>
-                  <linearGradient id="colorMedian" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f5c347" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#f5c347" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a282c" vertical={false} />
-                <XAxis dataKey="t" hide />
-                <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
-                <Tooltip contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }} itemStyle={{ color: '#e8e4e7' }} />
-                <Area type="monotone" dataKey="p95" stroke="none" fill="#4ade80" fillOpacity={0.05} />
-                <Area type="monotone" dataKey="p5" stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
-                <Line type="monotone" dataKey="media" stroke="#f5c347" strokeWidth={2} dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {simulationData.length === 0 ? (
+              <div className="h-full flex items-center justify-center font-mono text-xs text-obsidian-on-var opacity-50 text-center px-8">
+                Ejecuta un nuevo análisis para ver la simulación Monte Carlo de tu portafolio.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={simulationData}>
+                  <defs>
+                    <linearGradient id="colorMedian" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f5c347" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#f5c347" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a282c" vertical={false} />
+                  <XAxis dataKey="t" hide />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }} itemStyle={{ color: '#e8e4e7' }} />
+                  <Area type="monotone" dataKey="p95" stroke="none" fill="#4ade80" fillOpacity={0.05} />
+                  <Area type="monotone" dataKey="p5" stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
+                  <Line type="monotone" dataKey="media" stroke="#f5c347" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
           <div className="p-4 border-t border-obsidian-outline-var flex gap-6">
             <LegendItem color="bg-primary" label="Trayectoria media" />
