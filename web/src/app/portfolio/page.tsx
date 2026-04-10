@@ -5,9 +5,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 type Asset = {
-  id: string
   ticker: string
-  added_at: string
+  created_at: string
   latest_cvar?: number
   latest_verdict?: string
 }
@@ -17,7 +16,6 @@ export default function PortfolioPage() {
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
-  const [portfolioId, setPortfolioId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPortfolio()
@@ -32,63 +30,46 @@ export default function PortfolioPage() {
       return
     }
 
-    // Obtener o crear portafolio
-    const { data: portfolios } = await supabase
-      .from('portfolios')
-      .select('id')
+    const { data: analyses } = await supabase
+      .from('risk_analyses')
+      .select('ticker, cvar_95, verdict, created_at')
       .eq('user_id', user.id)
-      .order('created_at')
-      .limit(1)
+      .order('created_at', { ascending: false })
 
-    let pid: string
-    if (!portfolios || portfolios.length === 0) {
-      const { data: newP } = await supabase
-        .from('portfolios')
-        .insert({ user_id: user.id, name: 'Mi Portafolio' })
-        .select('id')
-        .single()
-      pid = newP!.id
-    } else {
-      pid = portfolios[0].id
-    }
-    setPortfolioId(pid)
-
-    // Cargar activos con ultimo analisis
-    const { data: rawAssets } = await supabase
-      .from('portfolio_assets')
-      .select('id, ticker, added_at')
-      .eq('portfolio_id', pid)
-      .order('added_at', { ascending: false })
-
-    if (!rawAssets) {
+    if (!analyses) {
       setLoading(false)
       return
     }
 
-    // Para cada activo, obtener ultimo analisis
-    const enriched = await Promise.all(
-      rawAssets.map(async (a) => {
-        const { data: analyses } = await supabase
-          .from('risk_analyses')
-          .select('cvar_95, verdict')
-          .eq('ticker', a.ticker)
-          .order('created_at', { ascending: false })
-          .limit(1)
-        return {
-          ...a,
-          latest_cvar: analyses?.[0]?.cvar_95,
-          latest_verdict: analyses?.[0]?.verdict,
-        }
+    const seen = new Set<string>()
+    const dedupedAssets: Asset[] = []
+    for (const analysis of analyses) {
+      const ticker = analysis.ticker?.toUpperCase()
+      if (!ticker || seen.has(ticker)) continue
+      seen.add(ticker)
+      dedupedAssets.push({
+        ticker,
+        created_at: analysis.created_at,
+        latest_cvar: analysis.cvar_95 ?? undefined,
+        latest_verdict: analysis.verdict ?? undefined,
       })
-    )
+    }
 
-    setAssets(enriched)
+    setAssets(dedupedAssets)
     setLoading(false)
   }
 
-  async function removeTicker(assetId: string) {
-    await supabase.from('portfolio_assets').delete().eq('id', assetId)
-    setAssets((prev) => prev.filter((a) => a.id !== assetId))
+  async function removeTicker(ticker: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    await supabase.from('risk_analyses').delete().eq('user_id', user.id).eq('ticker', ticker)
+    setAssets((prev) => prev.filter((a) => a.ticker !== ticker))
   }
 
   const cell: React.CSSProperties = {
@@ -164,7 +145,7 @@ export default function PortfolioPage() {
               const cvar = asset.latest_cvar
               const cvarColor = cvar == null ? '#555' : cvar > 20 ? '#ff6b6b' : cvar > 10 ? '#f5c347' : '#4ade80'
               return (
-                <tr key={asset.id} style={{ borderBottom: '1px solid #111' }}>
+                <tr key={asset.ticker} style={{ borderBottom: '1px solid #111' }}>
                   <td style={{ ...cell, color: '#57f1db', fontWeight: '700' }}>{asset.ticker}</td>
                   <td style={{ ...cell, color: cvarColor }}>{cvar != null ? `${cvar.toFixed(1)}%` : '—'}</td>
                   <td style={{ ...cell, color: '#888', fontSize: '11px' }}>
@@ -173,11 +154,11 @@ export default function PortfolioPage() {
                       : '—'}
                   </td>
                   <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
-                    {new Date(asset.added_at).toLocaleDateString('es-CO')}
+                    {new Date(asset.created_at).toLocaleDateString('es-CO')}
                   </td>
                   <td style={cell}>
                     <button
-                      onClick={() => removeTicker(asset.id)}
+                      onClick={() => removeTicker(asset.ticker)}
                       style={{
                         background: 'transparent',
                         border: '1px solid #3a1a1a',

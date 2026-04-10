@@ -1,27 +1,8 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
-  ComposedChart, Bar, Cell
-} from 'recharts';
-import { TrendingDown, TrendingUp, AlertTriangle, Layers, Info } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-
-// --- MOCK DATA ---
-const SIMULATION_DATA = Array.from({ length: 50 }, (_, i) => ({
-  time: i,
-  median: 100 + i * 0.5 + Math.sin(i * 0.3) * 2,
-  p5: 100 + i * 0.2 - i * 0.5 - Math.random() * 5,
-  p95: 100 + i * 0.8 + Math.random() * 8,
-  jump: i === 25 ? 85 : null
-}));
-
-const TICKER_RISK = [
-  { name: 'MSFT', cvar: 5.5, level: 'low', color: '#4ade80' },
-  { name: 'TSLA', cvar: 14.2, level: 'medium', color: '#f5c347' },
-  { name: 'XOM', cvar: 28.4, level: 'high', color: '#ff6b6b' },
-];
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { createClient } from '@/lib/supabase';
 
 const ESG_DATA = [
   { name: 'Verdes', value: 33, color: '#4ade80' },
@@ -29,29 +10,96 @@ const ESG_DATA = [
   { name: 'Brown Assets', value: 33, color: '#ff6b6b' },
 ];
 
+function gaussianRandom() {
+  return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
+}
+
+function buildSimulationData() {
+  return Array.from({ length: 50 }, (_, i) => {
+    const timeFactor = i / 50;
+    const media = 1 * Math.exp((0.08 - 0.5 * 0.25 * 0.25) * timeFactor + 0.25 * Math.sqrt(timeFactor) * gaussianRandom());
+    const cvar = media * (0.85 + Math.random() * 0.1);
+    return {
+      t: i,
+      media,
+      cvar,
+      p5: cvar,
+      p95: media * (1.1 + Math.random() * 0.08),
+    };
+  });
+}
+
 export default function Dashboard() {
+  const supabase = createClient();
   const [analyses, setAnalyses] = useState<any[]>([]);
+  const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
+  const [tickerRisk, setTickerRisk] = useState<any[]>([]);
+  const [uniqueTickerCount, setUniqueTickerCount] = useState(0);
+  const [simulationData] = useState(buildSimulationData);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchAnalyses() {
-      const { data, error } = await supabase
-        .from('risk_analyses')
-        .select('*')
-        .order('created_at', { ascending: false });
+  async function loadDashboard() {
+    const { data: { user } } = await supabase.auth.getUser();
 
-      if (data) {
-        setAnalyses(data);
-      }
+    if (!user) {
+      setAnalyses([]);
+      setLatestAnalysis(null);
+      setTickerRisk([]);
+      setUniqueTickerCount(0);
       setLoading(false);
+      return;
     }
-    fetchAnalyses();
 
-    // Subscribe to real-time updates
+    const { data: latestRows } = await supabase
+      .from('risk_analyses')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const { data: allAnalyses } = await supabase
+      .from('risk_analyses')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const { data: groupedRows } = await supabase
+      .from('risk_analyses')
+      .select('ticker, cvar_95, jump_prob, verdict, created_at')
+      .eq('user_id', user.id)
+      .order('ticker', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    const latestByTicker = new Map<string, any>();
+    for (const row of groupedRows ?? []) {
+      const ticker = row.ticker?.toUpperCase();
+      if (!ticker || latestByTicker.has(ticker)) continue;
+      latestByTicker.set(ticker, { ...row, ticker });
+    }
+
+    const tickerRiskRows = Array.from(latestByTicker.values()).map((row) => {
+      const cvar = Number(row.cvar_95 ?? 0);
+      return {
+        name: row.ticker,
+        cvar,
+        color: cvar < 10 ? '#4ade80' : cvar <= 20 ? '#f5c347' : '#ff6b6b',
+      };
+    });
+
+    setLatestAnalysis(latestRows?.[0] ?? null);
+    setAnalyses(allAnalyses ?? []);
+    setTickerRisk(tickerRiskRows);
+    setUniqueTickerCount(tickerRiskRows.length);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadDashboard();
+
     const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, (payload) => {
-        setAnalyses((prev) => [payload.new, ...prev]);
+      .channel('dashboard')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, () => {
+        loadDashboard();
       })
       .subscribe();
 
@@ -60,11 +108,22 @@ export default function Dashboard() {
     };
   }, []);
 
-  const lastAnalysis = analyses[0] || {};
-  
-  // Calculate aggregate stats or use last
-  const portfolioCVar = lastAnalysis.cvar_95 ? `${lastAnalysis.cvar_95}%` : "0.0%";
-  const probShock = lastAnalysis.jump_prob ? `${lastAnalysis.jump_prob}%` : "0.0%";
+  const portfolioCVar = latestAnalysis?.cvar_95 != null ? `${latestAnalysis.cvar_95}%` : "0.0%";
+  const probShock = latestAnalysis?.jump_prob != null ? `${latestAnalysis.jump_prob}%` : "0.0%";
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <section className="flex items-center gap-4">
+          <div className="font-mono text-[0.62rem] tracking-[0.14em] text-primary uppercase whitespace-nowrap">
+            Visión General del Portafolio
+          </div>
+          <div className="flex-1 h-[1px] bg-gradient-to-r from-obsidian-outline-var to-transparent" />
+        </section>
+        <div className="panel p-6 font-mono text-xs text-obsidian-on-var">Cargando dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -75,41 +134,20 @@ export default function Dashboard() {
         <div className="flex-1 h-[1px] bg-gradient-to-r from-obsidian-outline-var to-transparent" />
       </section>
 
-      {/* KPI Grid */}
       <div className="kpi-grid">
-        <KPICard 
-          label="CVAR 95% — ÚLTIMO ANÁLISIS" 
-          value={portfolioCVar} 
-          color="text-primary" 
-          delta={lastAnalysis.ticker || "Pendiente"} 
-          sub="PEOR 5% ESCENARIOS"
-          featured
-        />
-        <KPICard 
-          label="RETORNO ESPERADO — 6M" 
-          value="+8.3%" 
-          color="text-success" 
-          delta="▲ Percentil 50" 
-          sub="AJUSTADO POR RIESGO"
-        />
-        <KPICard 
-          label="PROB. SHOCK CLIMÁTICO" 
-          value={probShock} 
-          color="text-obsidian-on" 
-          delta="Poisson λ — anual" 
-          sub="JUMP-DIFFUSION MODEL"
-        />
-        <KPICard 
-          label="ACTIVOS ANALIZADOS" 
-          value={analyses.length.toString()} 
-          color="text-obsidian-on" 
-          delta={analyses.slice(0, 3).map(a => a.ticker).join(' · ')} 
+        <KPICard label="CVAR 95% — ÚLTIMO ANÁLISIS" value={portfolioCVar} color="text-primary" delta={latestAnalysis?.ticker || "Pendiente"} sub="PEOR 5% ESCENARIOS" featured />
+        <KPICard label="RETORNO ESPERADO — 6M" value="+8.3%" color="text-success" delta="▲ Percentil 50" sub="AJUSTADO POR RIESGO" />
+        <KPICard label="PROB. SHOCK CLIMÁTICO" value={probShock} color="text-obsidian-on" delta="Poisson λ — anual" sub="JUMP-DIFFUSION MODEL" />
+        <KPICard
+          label="ACTIVOS ANALIZADOS"
+          value={uniqueTickerCount.toString()}
+          color="text-obsidian-on"
+          delta={tickerRisk.slice(0, 3).map(a => a.name).join(' · ') || 'Sin análisis'}
           sub="HISTORIAL ACTIVO"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monte Carlo Simulation */}
         <div className="lg:col-span-2 panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center bg-obsidian-low">
             <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Monte Carlo Simulation</h3>
@@ -119,7 +157,7 @@ export default function Dashboard() {
           </div>
           <div className="h-[300px] w-full p-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={SIMULATION_DATA}>
+              <AreaChart data={simulationData}>
                 <defs>
                   <linearGradient id="colorMedian" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f5c347" stopOpacity={0.1}/>
@@ -127,26 +165,22 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a282c" vertical={false} />
-                <XAxis dataKey="time" hide />
+                <XAxis dataKey="t" hide />
                 <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }}
-                  itemStyle={{ color: '#e8e4e7' }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }} itemStyle={{ color: '#e8e4e7' }} />
                 <Area type="monotone" dataKey="p95" stroke="none" fill="#4ade80" fillOpacity={0.05} />
                 <Area type="monotone" dataKey="p5" stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
-                <Line type="monotone" dataKey="median" stroke="#f5c347" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="media" stroke="#f5c347" strokeWidth={2} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="p-4 border-t border-obsidian-outline-var flex gap-6">
-             <LegendItem color="bg-primary" label="Trayectoria media" />
-             <LegendItem color="bg-danger" label="Zona CVaR (peor 5%)" />
-             <LegendItem color="bg-success" label="Escenario optimista" />
+            <LegendItem color="bg-primary" label="Trayectoria media" />
+            <LegendItem color="bg-danger" label="Zona CVaR (peor 5%)" />
+            <LegendItem color="bg-success" label="Escenario optimista" />
           </div>
         </div>
 
-        {/* Right Column: Risk & ESG */}
         <div className="space-y-6">
           <div className="panel">
             <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
@@ -154,14 +188,14 @@ export default function Dashboard() {
               <span className="text-[0.58rem] font-mono text-primary">95% ES</span>
             </div>
             <div className="p-5 space-y-4">
-              {TICKER_RISK.map(ticker => (
+              {tickerRisk.map((ticker) => (
                 <div key={ticker.name} className="space-y-1.5">
                   <div className="flex justify-between text-[0.68rem] font-mono">
                     <span className="text-obsidian-on">{ticker.name}</span>
                     <span style={{ color: ticker.color }}>{ticker.cvar}%</span>
                   </div>
                   <div className="h-1.5 bg-obsidian-high w-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${(ticker.cvar / 30) * 100}%` }}
                       transition={{ duration: 1, ease: "easeOut" }}
@@ -171,6 +205,11 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+              {tickerRisk.length === 0 && (
+                <div className="text-center py-4 text-obsidian-on-var font-mono text-xs opacity-50">
+                  Sin activos analizados.
+                </div>
+              )}
             </div>
           </div>
 
@@ -194,57 +233,57 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="panel">
-           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Veredictos Ejecutivos</h3>
-              <span className="text-[0.58rem] font-mono text-primary">AGENTE IA</span>
-            </div>
-            <div className="p-4 space-y-3">
-              {analyses.slice(0, 3).map((a, i) => (
-                <VerdictCard 
-                  key={i}
-                  ticker={a.ticker} 
-                  action={a.verdict?.includes('COMPRAR') ? 'COMPRAR' : a.verdict?.includes('VENDER') ? 'VENDER' : 'MANTENER'} 
-                  color={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'} 
-                  text={a.verdict?.split('.')[0] + '.'} 
-                />
-              ))}
-              {analyses.length === 0 && (
-                <div className="text-center py-8 text-obsidian-on-var font-mono text-xs opacity-50">
-                  Esperando análisis del Bot...
-                </div>
-              )}
-            </div>
+          <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
+            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Veredictos Ejecutivos</h3>
+            <span className="text-[0.58rem] font-mono text-primary">AGENTE IA</span>
+          </div>
+          <div className="p-4 space-y-3">
+            {analyses.slice(0, 3).map((a, i) => (
+              <VerdictCard
+                key={i}
+                ticker={a.ticker}
+                action={a.verdict?.includes('COMPRAR') ? 'COMPRAR' : a.verdict?.includes('VENDER') ? 'VENDER' : 'MANTENER'}
+                color={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'}
+                text={a.verdict?.split('.')[0] + '.'}
+              />
+            ))}
+            {analyses.length === 0 && (
+              <div className="text-center py-8 text-obsidian-on-var font-mono text-xs opacity-50">
+                Esperando análisis del Bot...
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="panel">
-           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Historial de Análisis</h3>
-              <span className="text-[0.58rem] font-mono text-primary">SUPABASE</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-obsidian-outline-var">
-                    <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Ticker</th>
-                    <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Fecha</th>
-                    <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">CVAR 95%</th>
-                    <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Veredicto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-obsidian-outline-var/30">
-                  {analyses.map((a, i) => (
-                    <HistoryRow 
-                      key={i}
-                      ticker={a.ticker} 
-                      date={a.created_at ? new Date(a.created_at).toLocaleDateString() : 'N/A'} 
-                      cvar={`${a.cvar_95}%`} 
-                      type={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'} 
-                      verdict={a.verdict?.match(/\[(.*?)\]/)?.[1] || 'ANALIZADO'} 
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
+            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Historial de Análisis</h3>
+            <span className="text-[0.58rem] font-mono text-primary">SUPABASE</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-obsidian-outline-var">
+                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Ticker</th>
+                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Fecha</th>
+                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">CVAR 95%</th>
+                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Veredicto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-obsidian-outline-var/30">
+                {analyses.map((a, i) => (
+                  <HistoryRow
+                    key={i}
+                    ticker={a.ticker}
+                    date={a.created_at ? new Date(a.created_at).toLocaleDateString() : 'N/A'}
+                    cvar={`${a.cvar_95}%`}
+                    type={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'}
+                    verdict={a.verdict?.match(/\[(.*?)\]/)?.[1] || 'ANALIZADO'}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -276,7 +315,7 @@ function LegendItem({ color, label }: { color: string, label: string }) {
 function VerdictCard({ ticker, action, color, text }: any) {
   const borderColors: any = { success: 'border-l-success', danger: 'border-l-danger', primary: 'border-l-primary' };
   const badgeColors: any = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' };
-  
+
   return (
     <div className={cn("p-3 bg-obsidian-mid border border-obsidian-outline-var border-l-3 grid grid-cols-[auto_1fr_auto] items-center gap-4 hover:bg-obsidian-high transition-colors", borderColors[color])}>
       <div className="font-mono text-[0.75rem] font-bold tracking-widest text-obsidian-on">{ticker}</div>
