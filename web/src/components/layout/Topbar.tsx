@@ -1,8 +1,18 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
 
 export function Topbar() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
+
   return (
     <header className="topbar">
       <div className="font-display text-[0.78rem] font-semibold tracking-wider text-obsidian-on-var">
@@ -25,6 +35,12 @@ export function Topbar() {
             Carlos M.
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="font-mono text-[0.62rem] tracking-widest px-3 py-1.5 border border-obsidian-outline-var text-obsidian-on-var hover:text-primary hover:border-primary/50 transition-colors uppercase"
+        >
+          Logout
+        </button>
       </div>
     </header>
   );
