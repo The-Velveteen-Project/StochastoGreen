@@ -55,30 +55,47 @@ async def health():
 async def fetch_alphavantage(symbol: str) -> dict:
     """Trigger y Data Ingestion: Obtiene datos fundamentales desde AlphaVantage."""
     url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={ALPHAVANTAGE_API}"
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, timeout=15.0)
-        data = response.json()
-        log.info(f"AlphaVantage response keys for {symbol}: {list(data.keys()) if data else 'empty response'}")
-        if not data or "Symbol" not in data:
-            log.error(f"AlphaVantage unexpected response for {symbol}: {data}")
-            raise ValueError(
-                f"AlphaVantage returned no valid data for {symbol}. "
-                f"Response keys: {list(data.keys()) if data else 'empty'}. "
-                f"Possible rate limit or invalid ticker."
-            )
-        return data
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=15.0)
+            response.raise_for_status()
+            data = response.json()
+            log.info(f"AlphaVantage response keys for {symbol}: {list(data.keys()) if data else 'empty response'}")
+
+            if isinstance(data, dict) and ("Note" in data or "Information" in data):
+                log.warning(f"AlphaVantage rate limit/info response for {symbol}: {data}")
+                return {}
+
+            if not data or "Symbol" not in data:
+                log.warning(f"AlphaVantage returned empty/invalid payload for {symbol}. Using fundamental fallback.")
+                return {}
+
+            return data
+    except Exception as e:
+        log.warning(f"AlphaVantage request failed for {symbol}: {e}. Using fundamental fallback.")
+        return {}
 
 async def run_fundamental_analyst(llm, company_data: dict) -> str:
     """Rama A: Evaluación Fundamental Cruda de Salud Corporativa."""
-    prompt = PromptTemplate.from_template(
+    has_fundamentals = bool(company_data and company_data.get("Symbol"))
+    prompt_prefix = (
         "Eres un analista financiero experto. Tu objetivo es resumir la salud financiera de la empresa, "
         "analiza estos fundamentales y dame tu veredicto de salud financiera en 2 líneas:\n"
-        "- Símbolo: {Symbol}\n"
-        "- Sector: {Sector}\n"
-        "- Industria: {Industry}\n"
-        "- PE Ratio: {PERatio}\n"
-        "- Margen de Beneficio: {ProfitMargin}\n"
-        "- EBITDA: {EBITDA}"
+    )
+    if not has_fundamentals:
+        prompt_prefix += (
+            "No hay datos fundamentales disponibles para este ticker. "
+            "Basa tu análisis solo en el perfil sectorial y riesgo climático.\n"
+        )
+
+    prompt = PromptTemplate.from_template(
+        prompt_prefix
+        + "- Símbolo: {Symbol}\n"
+        + "- Sector: {Sector}\n"
+        + "- Industria: {Industry}\n"
+        + "- PE Ratio: {PERatio}\n"
+        + "- Margen de Beneficio: {ProfitMargin}\n"
+        + "- EBITDA: {EBITDA}"
     )
     chain = prompt | llm
 
@@ -115,11 +132,8 @@ async def call_python_sde_engine(symbol: str, sector: str) -> dict:
             "cvar_95": 22.4
         }
 
-async def run_technical_analyst(llm, company_data: dict) -> str:
+async def run_technical_analyst(llm, symbol: str, sector: str) -> tuple[str, dict]:
     """Rama B: Analista Cuantitativo que interpreta el riesgo matemático del SDE."""
-    symbol = company_data.get("Symbol", "Unknown")
-    sector = company_data.get("Sector", "Unknown")
-
     # Obtener inferencia estocástica desde el microservicio paralelo
     sde_data = await call_python_sde_engine(symbol, sector)
 
@@ -146,7 +160,7 @@ async def run_technical_analyst(llm, company_data: dict) -> str:
         "expected_drop": sde_data.get("projected_expected_drop", "N/A"),
         "cvar_95": sde_data.get("cvar_95", "N/A")
     })
-    return result.content
+    return result.content, sde_data
 
 async def run_executive_agent(llm, symbol: str, fundamental_report: str, technical_report: str) -> str:
     """Nodo Orquestador de Merge: Consolida el input y emite veredicto Ejecutivo."""
@@ -176,15 +190,17 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
     ticker = request.ticker
     log.info(f"Starting analysis for {ticker}")
 
-    try:
-        company_data = await fetch_alphavantage(ticker)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"AlphaVantage fetch failed: {str(e)}"
-        )
+    company_data = await fetch_alphavantage(ticker)
+    has_fundamental_data = bool(company_data and company_data.get("Symbol"))
+    sector = company_data.get("Sector", "Unknown") if company_data else "Unknown"
+    company_data_for_prompt = {
+        "Symbol": ticker,
+        "Sector": sector,
+        "Industry": company_data.get("Industry", "N/A") if company_data else "N/A",
+        "PERatio": company_data.get("PERatio", "N/A") if company_data else "N/A",
+        "ProfitMargin": company_data.get("ProfitMargin", "N/A") if company_data else "N/A",
+        "EBITDA": company_data.get("EBITDA", "N/A") if company_data else "N/A",
+    }
 
     llm_analyst = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash", temperature=0.2
@@ -195,29 +211,40 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
 
     # Paralelismo real con create_task
     fundamental_task = asyncio.create_task(
-        run_fundamental_analyst(llm_analyst, company_data)
+        run_fundamental_analyst(llm_analyst, company_data_for_prompt)
     )
     technical_task = asyncio.create_task(
-        run_technical_analyst(llm_analyst, company_data)
+        run_technical_analyst(llm_analyst, ticker, sector)
     )
 
-    try:
-        fundamental_report, technical_report = await asyncio.gather(
-            fundamental_task, technical_task
-        )
-    except Exception as e:
+    fundamental_result, technical_result = await asyncio.gather(
+        fundamental_task, technical_task, return_exceptions=True
+    )
+    if isinstance(technical_result, Exception):
         raise HTTPException(
             status_code=500,
-            detail=f"Agent analysis failed: {str(e)}"
+            detail=f"Technical analysis failed: {str(technical_result)}"
         )
+    if isinstance(fundamental_result, Exception):
+        log.warning(f"Fundamental agent failed for {ticker}: {fundamental_result}")
+        has_fundamental_data = False
+        fundamental_report = (
+            "No hay datos fundamentales disponibles para este ticker. "
+            "Basa tu análisis solo en el perfil sectorial y riesgo climático."
+        )
+    else:
+        fundamental_report = fundamental_result
+
+    technical_report, sde_data = technical_result
 
     executive_verdict = await run_executive_agent(
         llm_executive, ticker, fundamental_report, technical_report
     )
-
-    sde_data = await call_python_sde_engine(
-        ticker, company_data.get("Sector", "Unknown")
-    )
+    if not has_fundamental_data:
+        executive_verdict = (
+            "Análisis cuantitativo únicamente — sin datos fundamentales.\n\n"
+            f"{executive_verdict}"
+        )
 
     log.info(f"Analysis complete for {ticker}")
 
