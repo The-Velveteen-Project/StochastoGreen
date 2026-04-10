@@ -33,19 +33,35 @@ export async function middleware(request: NextRequest) {
 
   const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r))
   const isAuthRoute = AUTH_ROUTES.some(r => pathname.startsWith(r))
+  const isOnboarding = pathname === '/onboarding'
 
-  // Sin sesión intentando acceder a ruta protegida → login
-  if (!user && isProtected) {
+  // Sin sesión → login
+  if (!user && (isProtected || isOnboarding)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Con sesión intentando ir a login/register → dashboard
+  // Con sesión en rutas de auth → dashboard
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
+  }
+
+  // Con sesión en rutas protegidas → verificar si tiene Telegram vinculado
+  if (user && isProtected) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('telegram_chat_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.telegram_chat_id) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
