@@ -250,6 +250,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model_name="gemini-2.5-flash",
             system_instruction=SYSTEM_PROMPT
         )
+        log.info(f"History length: {len(history)}, last role: {history[-1]['role'] if history else 'empty'}")
         chat = model.start_chat(history=history[:-1])
         response = await asyncio.to_thread(chat.send_message, user_text)
         reply = response.text.strip()
@@ -279,12 +280,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["history"] = history
 
             tickers_fmt = " · ".join(tickers)
-            await update.message.reply_text(
-                f"⚙️ Analizando: *{escape_md(tickers_fmt)}*\n\n"
-                "Simulando 10,000 escenarios por activo\\. "
-                "30–90 segundos por ticker\\.\\.\\.",
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            try:
+                await update.message.reply_text(
+                    f"⚙️ Analizando: *{escape_md(tickers_fmt)}*\n\n"
+                    "Simulando 10,000 escenarios por activo\\. "
+                    "30–90 segundos por ticker\\.\\.\\.",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+            except Exception:
+                await update.message.reply_text(
+                    f"⚙️ Analizando: {tickers_fmt}\n\n"
+                    "Simulando 10,000 escenarios por activo. "
+                    "30-90 segundos por ticker..."
+                )
 
             results = []
             chat_id = update.message.from_user.id
@@ -329,10 +337,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if ticker != tickers[-1]:
                     await asyncio.sleep(3)
 
-            await update.message.reply_text(
-                build_report(results),
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            try:
+                await update.message.reply_text(
+                    build_report(results),
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+            except Exception:
+                plain = "\n".join(
+                    f"{r['ticker']}: CVaR {r.get('cvar', '?')}% | Shock {r.get('jump_prob', '?')}%"
+                    if "error" not in r else f"{r['ticker']}: datos no disponibles"
+                    for r in results
+                )
+                await update.message.reply_text(f"Reporte de riesgo:\n\n{plain}")
 
             # Síntesis Gemini
             successful = [r for r in results if "error" not in r]
@@ -344,10 +360,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     summary_chat = model.start_chat(history=[])
                     sr = await asyncio.to_thread(summary_chat.send_message, summary_prompt)
-                    await update.message.reply_text(
-                        f"🧠 *Veredicto del asesor:*\n\n{escape_md(sr.text.strip())}",
-                        parse_mode=ParseMode.MARKDOWN_V2
-                    )
+                    try:
+                        await update.message.reply_text(
+                            f"🧠 *Veredicto del asesor:*\n\n{escape_md(sr.text.strip())}",
+                            parse_mode=ParseMode.MARKDOWN_V2
+                        )
+                    except Exception:
+                        await update.message.reply_text(
+                            f"🧠 Veredicto del asesor:\n\n{sr.text.strip()}"
+                        )
                 except Exception as e:
                     log.warning(f"Summary failed: {e}")
 
