@@ -39,7 +39,7 @@ export default function LandingPage() {
               <span className="text-primary font-extrabold uppercase italic tracking-tighter">Quantified.</span>
             </h1>
             <p className="text-obsidian-on-var text-[0.85rem] leading-relaxed mb-8 max-w-sm">
-              Análisis estocástico avanzado mediante procesos de Salto-Difusión (Kou Jump-Diffusion) para la valoración de carteras ante la transición climática.
+              Análisis estocástico avanzado mediante procesos de Salto-Difusión (Merton Jump-Diffusion) para la valoración de carteras ante la transición climática.
             </p>
             
             <div className="flex gap-4">
@@ -85,7 +85,7 @@ export default function LandingPage() {
             © 2026 THE VELVETEEN PROJECT // STOCHASTO_GREEN_LABS
           </div>
           <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-on-var">
-            LATENCY: 12ms // BUFFER: 100% // SCENARIO: NGFS_ORDERLY_2050
+            SCENARIO: NGFS_PHASE4_2023 // MODEL: MERTON_JD // SEED: 42
           </div>
         </footer>
       </div>

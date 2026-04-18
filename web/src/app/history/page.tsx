@@ -1,28 +1,35 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { createClient }        from '@/lib/supabase'
+import { useRouter }           from 'next/navigation'
+import type { VerdictAction }  from '@/lib/supabase'
 
 type Analysis = {
-  id: string
-  ticker: string
-  cvar_95: number | null
-  jump_prob: number | null
-  verdict: string | null
-  created_at: string
+  id:              string
+  ticker:          string
+  cvar_95:         number | null
+  jump_prob:       number | null
+  verdict_action:  VerdictAction | null
+  climate_beta:    number | null
+  created_at:      string
+}
+
+const VERDICT_COLORS: Record<VerdictAction, string> = {
+  COMPRAR:  '#4ade80',
+  MANTENER: '#f5c347',
+  VENDER:   '#ff6b6b',
 }
 
 export default function HistoryPage() {
   const supabase = createClient()
-  const router = useRouter()
+  const router   = useRouter()
   const [analyses, setAnalyses] = useState<Analysis[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
     loadHistory()
 
-    // Real-time: nuevos análisis del bot aparecen aquí
     const channel = supabase
       .channel('history-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, (payload) => {
@@ -30,23 +37,16 @@ export default function HistoryPage() {
       })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   async function loadHistory() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
 
     const { data } = await supabase
       .from('risk_analyses')
-      .select('id, ticker, cvar_95, jump_prob, verdict, created_at')
+      .select('id, ticker, cvar_95, jump_prob, verdict_action, climate_beta, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -56,11 +56,11 @@ export default function HistoryPage() {
   }
 
   const cell: React.CSSProperties = {
-    padding: '12px 16px',
+    padding:      '12px 16px',
     borderBottom: '1px solid #111',
-    fontSize: '12px',
-    fontFamily: "'JetBrains Mono', monospace",
-    color: '#ccc',
+    fontSize:     '12px',
+    fontFamily:   "'JetBrains Mono', monospace",
+    color:        '#ccc',
     verticalAlign: 'middle',
   }
 
@@ -76,14 +76,7 @@ export default function HistoryPage() {
       {loading ? (
         <div style={{ color: '#444', fontSize: '12px' }}>Cargando historial...</div>
       ) : analyses.length === 0 ? (
-        <div
-          style={{
-            border: '1px solid #1a1a1c',
-            padding: '48px',
-            textAlign: 'center',
-            color: '#444',
-          }}
-        >
+        <div style={{ border: '1px solid #1a1a1c', padding: '48px', textAlign: 'center', color: '#444' }}>
           <div style={{ fontSize: '32px', marginBottom: '16px' }}>📋</div>
           <div style={{ fontSize: '13px', color: '#666' }}>Sin análisis registrados aún</div>
           <div style={{ fontSize: '11px', marginTop: '8px', color: '#444' }}>
@@ -94,18 +87,12 @@ export default function HistoryPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'VEREDICTO', 'FECHA'].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    ...cell,
-                    color: '#555',
-                    fontSize: '10px',
-                    letterSpacing: '2px',
-                    textAlign: 'left',
-                    borderBottom: '1px solid #2a2a2a',
-                  }}
-                >
+              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'BETA CLIMÁTICO', 'ACCIÓN', 'FECHA'].map((h) => (
+                <th key={h} style={{
+                  ...cell,
+                  color: '#555', fontSize: '10px', letterSpacing: '2px',
+                  textAlign: 'left', borderBottom: '1px solid #2a2a2a',
+                }}>
                   {h}
                 </th>
               ))}
@@ -113,20 +100,39 @@ export default function HistoryPage() {
           </thead>
           <tbody>
             {analyses.map((a) => {
-              const cvar = a.cvar_95
-              const cvarColor = cvar == null ? '#555' : cvar > 20 ? '#ff6b6b' : cvar > 10 ? '#f5c347' : '#4ade80'
+              const cvar       = a.cvar_95
+              const cvarColor  = cvar == null ? '#555' : cvar > 20 ? '#ff6b6b' : cvar > 10 ? '#f5c347' : '#4ade80'
+              const action     = a.verdict_action
+              const actionColor = action ? VERDICT_COLORS[action] : '#555'
               return (
                 <tr key={a.id}>
                   <td style={{ ...cell, color: '#57f1db', fontWeight: '700' }}>{a.ticker}</td>
-                  <td style={{ ...cell, color: cvarColor }}>{cvar != null ? `${cvar.toFixed(1)}%` : '—'}</td>
-                  <td style={{ ...cell, color: '#888' }}>{a.jump_prob != null ? `${a.jump_prob.toFixed(1)}%` : '—'}</td>
-                  <td style={{ ...cell, color: '#888', fontSize: '11px', maxWidth: '300px' }}>
-                    {a.verdict ? a.verdict.slice(0, 60) + (a.verdict.length > 60 ? '…' : '') : '—'}
+                  <td style={{ ...cell, color: cvarColor }}>
+                    {cvar != null ? `${cvar.toFixed(1)}%` : '—'}
+                  </td>
+                  <td style={{ ...cell, color: '#888' }}>
+                    {a.jump_prob != null ? `${a.jump_prob.toFixed(1)}%` : '—'}
+                  </td>
+                  <td style={{ ...cell, color: '#888' }}>
+                    {a.climate_beta != null ? a.climate_beta.toFixed(1) : '—'}
+                  </td>
+                  <td style={{ ...cell }}>
+                    {action ? (
+                      <span style={{
+                        color:        actionColor,
+                        border:       `1px solid ${actionColor}40`,
+                        padding:      '2px 8px',
+                        fontSize:     '10px',
+                        letterSpacing: '1px',
+                        fontWeight:   '700',
+                      }}>
+                        {action}
+                      </span>
+                    ) : '—'}
                   </td>
                   <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
                     {new Date(a.created_at).toLocaleString('es-CO', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
+                      dateStyle: 'short', timeStyle: 'short',
                     })}
                   </td>
                 </tr>

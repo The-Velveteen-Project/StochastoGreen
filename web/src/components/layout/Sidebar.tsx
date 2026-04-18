@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { LayoutDashboard, Briefcase, History, Bell, ArrowLeft, Terminal } from 'lucide-react';
+import { LayoutDashboard, Briefcase, History, Bell, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ const navItems = [
   { name: 'DASHBOARD', href: '/dashboard', icon: LayoutDashboard },
   { name: 'PORTAFOLIO', href: '/portfolio', icon: Briefcase },
   { name: 'HISTORIAL', href: '/history', icon: History },
-  { name: 'ALERTAS', href: '/alerts', icon: Bell, badge: '2' },
+  { name: 'ALERTAS', href: '/alerts', icon: Bell },
 ];
 
 export function Sidebar() {
@@ -46,11 +46,6 @@ export function Sidebar() {
             >
               <item.icon size={16} className={cn("shrink-0", isActive ? "text-primary" : "text-obsidian-on-var")} />
               <span>{item.name}</span>
-              {item.badge && (
-                <span className="ml-auto bg-danger text-white text-[0.5rem] px-1.5 py-0.5 font-mono">
-                  {item.badge}
-                </span>
-              )}
             </Link>
           );
         })}
