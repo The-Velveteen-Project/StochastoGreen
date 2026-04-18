@@ -3,6 +3,7 @@ uvicorn
 yfinance
 pandas
 numpy
+scipy
 pydantic
 langchain==0.2.16
 langchain-google-genai==1.0.10
