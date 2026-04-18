@@ -45,7 +45,9 @@ export default function OnboardingPage() {
 
   const generateCode = useCallback(async (uid: string) => {
     setGenerating(true)
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(6))
+    const code  = Array.from(bytes).map(b => CHARS[b % CHARS.length]).join('')
 
     // Eliminar codigos anteriores no usados de este usuario
     await supabase.from('telegram_link_codes').delete().eq('user_id', uid).eq('used', false)
