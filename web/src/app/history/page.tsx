@@ -6,13 +6,14 @@ import { useRouter }           from 'next/navigation'
 import type { VerdictAction }  from '@/lib/supabase'
 
 type Analysis = {
-  id:              string
-  ticker:          string
-  cvar_95:         number | null
-  jump_prob:       number | null
-  verdict_action:  VerdictAction | null
-  climate_beta:    number | null
-  created_at:      string
+  id:                  string
+  ticker:              string
+  cvar_95:             number | null
+  jump_prob:           number | null
+  verdict_action:      VerdictAction | null
+  verdict_confidence:  number | null
+  climate_beta:        number | null
+  created_at:          string
 }
 
 const VERDICT_COLORS: Record<VerdictAction, string> = {
@@ -46,7 +47,7 @@ export default function HistoryPage() {
 
     const { data } = await supabase
       .from('risk_analyses')
-      .select('id, ticker, cvar_95, jump_prob, verdict_action, climate_beta, created_at')
+      .select('id, ticker, cvar_95, jump_prob, verdict_action, verdict_confidence, climate_beta, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -87,7 +88,7 @@ export default function HistoryPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'BETA CLIMÁTICO', 'ACCIÓN', 'FECHA'].map((h) => (
+              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'BETA CLIMÁTICO', 'ACCIÓN', 'CONFIANZA', 'FECHA'].map((h) => (
                 <th key={h} style={{
                   ...cell,
                   color: '#555', fontSize: '10px', letterSpacing: '2px',
@@ -129,6 +130,22 @@ export default function HistoryPage() {
                         {action}
                       </span>
                     ) : '—'}
+                  </td>
+                  <td style={{ ...cell }}>
+                    {a.verdict_confidence != null ? (() => {
+                      const pct = Math.round(a.verdict_confidence * 100)
+                      const barColor = pct >= 70 ? '#4ade80' : pct >= 40 ? '#f5c347' : '#ff6b6b'
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '72px' }}>
+                          <div style={{ flex: 1, height: '3px', background: '#2a2a2a', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '2px' }} />
+                          </div>
+                          <span style={{ fontSize: '10px', color: barColor, fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>
+                            {pct}%
+                          </span>
+                        </div>
+                      )
+                    })() : <span style={{ color: '#555' }}>—</span>}
                   </td>
                   <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
                     {new Date(a.created_at).toLocaleString('es-CO', {

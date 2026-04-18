@@ -337,7 +337,7 @@ export default function Dashboard() {
                 ? a.verdict_justification.split('.')[0] + '.'
                 : '—'
               return (
-                <VerdictCard key={i} ticker={a.ticker} action={action} color={color} text={text} />
+                <VerdictCard key={i} ticker={a.ticker} action={action} color={color} text={text} confidence={a.verdict_confidence} />
               )
             })}
             {analyses.length === 0 && (
@@ -417,21 +417,34 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-function VerdictCard({ ticker, action, color, text }: {
-  ticker: string; action: VerdictAction; color: 'success' | 'danger' | 'primary'; text: string
+function VerdictCard({ ticker, action, color, text, confidence }: {
+  ticker: string; action: VerdictAction; color: 'success' | 'danger' | 'primary'
+  text: string; confidence?: number | null
 }) {
   const borderColors = { success: 'border-l-success', danger: 'border-l-danger', primary: 'border-l-primary' }
   const badgeColors  = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' }
+  const barColors    = { success: 'bg-success', danger: 'bg-danger', primary: 'bg-primary' }
+  const pct = confidence != null ? Math.round(confidence * 100) : null
   return (
     <div className={cn(
-      'p-3 bg-obsidian-mid border border-obsidian-outline-var border-l-3 grid grid-cols-[auto_1fr_auto] items-center gap-4 hover:bg-obsidian-high transition-colors',
+      'p-3 bg-obsidian-mid border border-obsidian-outline-var border-l-3 hover:bg-obsidian-high transition-colors',
       borderColors[color]
     )}>
-      <div className="font-mono text-[0.75rem] font-bold tracking-widest text-obsidian-on">{ticker}</div>
-      <div className="text-[0.72rem] text-obsidian-on-var leading-snug line-clamp-2">{text}</div>
-      <div className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-tighter', badgeColors[color])}>
-        {action}
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+        <div className="font-mono text-[0.75rem] font-bold tracking-widest text-obsidian-on">{ticker}</div>
+        <div className="text-[0.72rem] text-obsidian-on-var leading-snug line-clamp-2">{text}</div>
+        <div className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-tighter', badgeColors[color])}>
+          {action}
+        </div>
       </div>
+      {pct != null && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex-1 h-[2px] bg-obsidian-outline-var rounded-full overflow-hidden">
+            <div className={cn('h-full rounded-full', barColors[color])} style={{ width: `${pct}%` }} />
+          </div>
+          <span className="font-mono text-[0.55rem] text-obsidian-outline shrink-0">{pct}% conf.</span>
+        </div>
+      )}
     </div>
   )
 }
