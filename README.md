@@ -23,37 +23,55 @@ The system is deliberately split into two independent layers:
 
 ## Architecture
 
-```
-                    ┌──────────────────────────────────┐
-                    │         Telegram Bot              │
-                    │  (conversation + report display)  │
-                    └─────────────┬────────────────────┘
-                                  │ POST /analyze
-                    ┌─────────────▼────────────────────┐
-                    │       Orchestrator (FastAPI)       │
-                    │                                   │
-                    │  ┌─────────────┐ ┌─────────────┐ │
-                    │  │  Agent A    │ │  Agent B    │ │  ← parallel
-                    │  │ Fundamental │ │ Quantitative│ │
-                    │  │  Analyst   │ │  Analyst   │ │
-                    │  └─────────────┘ └──────┬──────┘ │
-                    │                         │        │
-                    │              POST /simulate_risk  │
-                    │                         │        │
-                    │  ┌──────────────────────▼──────┐  │
-                    │  │       SDE Engine (FastAPI)  │  │
-                    │  │  Merton Jump-Diffusion      │  │
-                    │  │  Euler-Maruyama Monte Carlo │  │
-                    │  └─────────────────────────────┘  │
-                    │                                   │
-                    │  ┌─────────────────────────────┐  │
-                    │  │  Agent C — Executive Verdict│  │  ← structured output
-                    │  │  action: COMPRAR|MANTENER   │  │
-                    │  │          |VENDER            │  │
-                    │  └─────────────────────────────┘  │
-                    └──────────────────────────────────┘
-                                  │
-                            Supabase DB
+```mermaid
+flowchart TB
+    U(["👤  Usuario"])
+
+    subgraph IFACE["  Interfaces  "]
+        direction LR
+        TG["📱 Telegram Bot\nbot.py · Grammy · async"]
+        WEB["🌐 Web Dashboard\nNext.js 16 · App Router · Tailwind"]
+    end
+
+    subgraph ORCH["  Orchestrator — FastAPI :8001  "]
+        ORC["orchestrator.py  ·  POST /analyze\nasyncio.gather → Agents A ∥ B"]
+
+        subgraph LLM["  LangChain · Gemini Flash  "]
+            direction LR
+            AF["🔬 Agent A\nFundamental Analyst\nAlphaVantage fundamentals"]
+            AQ["📐 Agent B\nQuant Analyst\ninterprets SDE output"]
+            EX["⚖️ Agent C — Executive\nwith_structured_output\nExecutiveVerdict · Pydantic"]
+        end
+    end
+
+    subgraph SDE_LAYER["  SDE Engine — FastAPI :8000  "]
+        direction LR
+        SDE["📊 main.py  ·  POST /simulate\nMerton Jump-Diffusion · Euler-Maruyama\nN = 10,000 paths · SEED = 42\nCVaR 95%  ·  NGFS Phase 4 Climate Beta"]
+        YF["📈 yfinance\n5 years daily OHLCV"]
+    end
+
+    subgraph SB["  Supabase  "]
+        direction LR
+        DB[("🗄️ PostgreSQL\nrisk_analyses")]
+        RT["⚡ Realtime\npostgres_changes"]
+        AUTH["🔐 Auth"]
+    end
+
+    U -->|"Telegram: /analizar AAPL"| TG
+    U -->|"Browser"| WEB
+    TG -->|"HTTP POST /analyze"| ORC
+    ORC -->|"HTTP POST /simulate"| SDE
+    SDE <-->|"download(ticker, period=5y)"| YF
+    SDE -->|"cvar_95 · jump_prob\nclimate_beta · simulation_paths"| ORC
+    ORC -->|"asyncio.gather"| AF
+    ORC -->|"asyncio.gather"| AQ
+    AF -->|"fundamental_report"| EX
+    AQ -->|"technical_report"| EX
+    EX -->|"verdict_action · justification · confidence\nCOMPRAR · MANTENER · VENDER"| ORC
+    ORC -->|"INSERT"| DB
+    DB --> RT
+    RT -->|"Realtime subscription"| WEB
+    WEB --- AUTH
 ```
 
 ---
