@@ -1,14 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { createClient }        from '@/lib/supabase'
+import { useRouter }           from 'next/navigation'
+import type { VerdictAction }  from '@/lib/supabase'
 
 type Asset = {
-  ticker: string
-  created_at: string
-  latest_cvar?: number
-  latest_verdict?: string
+  ticker:               string
+  created_at:           string
+  latest_cvar?:         number
+  latest_verdict_action?: VerdictAction | null
+}
+
+const VERDICT_COLORS: Record<VerdictAction, string> = {
+  COMPRAR:  '#4ade80',
+  MANTENER: '#f5c347',
+  VENDER:   '#ff6b6b',
 }
 
 export default function PortfolioPage() {
@@ -32,7 +39,7 @@ export default function PortfolioPage() {
 
     const { data: analyses } = await supabase
       .from('risk_analyses')
-      .select('ticker, cvar_95, verdict, created_at')
+      .select('ticker, cvar_95, verdict_action, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -49,9 +56,9 @@ export default function PortfolioPage() {
       seen.add(ticker)
       dedupedAssets.push({
         ticker,
-        created_at: analysis.created_at,
-        latest_cvar: analysis.cvar_95 ?? undefined,
-        latest_verdict: analysis.verdict ?? undefined,
+        created_at:           analysis.created_at,
+        latest_cvar:          analysis.cvar_95 ?? undefined,
+        latest_verdict_action: analysis.verdict_action ?? null,
       })
     }
 
@@ -148,10 +155,20 @@ export default function PortfolioPage() {
                 <tr key={asset.ticker} style={{ borderBottom: '1px solid #111' }}>
                   <td style={{ ...cell, color: '#57f1db', fontWeight: '700' }}>{asset.ticker}</td>
                   <td style={{ ...cell, color: cvarColor }}>{cvar != null ? `${cvar.toFixed(1)}%` : '—'}</td>
-                  <td style={{ ...cell, color: '#888', fontSize: '11px' }}>
-                    {asset.latest_verdict
-                      ? asset.latest_verdict.slice(0, 40) + (asset.latest_verdict.length > 40 ? '…' : '')
-                      : '—'}
+                  <td style={cell}>
+                    {asset.latest_verdict_action ? (
+                      <span style={{
+                        color:         VERDICT_COLORS[asset.latest_verdict_action],
+                        border:        `1px solid ${VERDICT_COLORS[asset.latest_verdict_action]}40`,
+                        padding:       '2px 8px',
+                        fontSize:      '10px',
+                        letterSpacing: '1px',
+                        fontWeight:    '700',
+                        fontFamily:    "'JetBrains Mono', monospace",
+                      }}>
+                        {asset.latest_verdict_action}
+                      </span>
+                    ) : '—'}
                   </td>
                   <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
                     {new Date(asset.created_at).toLocaleDateString('es-CO')}

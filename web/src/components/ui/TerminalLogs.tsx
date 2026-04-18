@@ -3,16 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MOCK_LOGS = [
-  "[SYSTEM] INITIALIZING SDE ENGINE v2.4...",
-  "[OK] CONNECTED TO NGFS CLIMATE DATASET",
-  "[INF] FETCHING BLOOMBERG ESG METRICS...",
-  "[CALC] CALIBRATING KOU JUMP-DIFFUSION...",
-  "[SIM] STARTING MONTE CARLO (10,000 PATHS)",
-  "[WARN] HIGH CLIMATE BETA DETECTED IN ENERGY SECTOR",
-  "[CALC] UPDATING TAIL RISK ESTIMATES (VAR 95%)",
-  "[OK] ORCHESTRATOR SYNC COMPLETED",
-  "[SYSTEM] WAITING FOR USER INPUT..."
+const BOOT_LOGS = [
+  "[SYSTEM] INICIALIZANDO SDE ENGINE...",
+  "[OK] yfinance CONECTADO · DESCARGANDO PRECIOS HISTÓRICOS",
+  "[CALC] CALIBRANDO MERTON JUMP-DIFFUSION (µ, σ, λ, µ_J)",
+  "[INF] APLICANDO NGFS PHASE 4 · FACTOR CLIMÁTICO SECTORIAL",
+  "[SIM] INICIANDO MONTE CARLO (N=10000 PATHS, SEED=42)",
+  "[WARN] BETA CLIMÁTICO ELEVADO DETECTADO EN SECTOR ENERGÍA",
+  "[CALC] ESTIMANDO CVaR 95% (EXPECTED SHORTFALL)",
+  "[OK] AGENTE CUANTITATIVO COMPLETADO",
+  "[OK] AGENTE FUNDAMENTAL (LLM) COMPLETADO",
+  "[OK] VEREDICTO EJECUTIVO GENERADO · EN ESPERA...",
 ];
 
 export function TerminalLogs() {
@@ -22,8 +23,8 @@ export function TerminalLogs() {
   useEffect(() => {
     let index = 0;
     const interval = setInterval(() => {
-      if (index < MOCK_LOGS.length) {
-        setLogs(prev => [...prev, MOCK_LOGS[index]]);
+      if (index < BOOT_LOGS.length) {
+        setLogs(prev => [...prev, BOOT_LOGS[index]]);
         index++;
       } else {
         clearInterval(interval);

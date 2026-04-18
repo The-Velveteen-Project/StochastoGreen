@@ -1,105 +1,153 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { createClient } from '@/lib/supabase';
+import type { VerdictAction } from '@/lib/supabase';
 
-const ESG_DATA = [
-  { name: 'Verdes', value: 33, color: '#4ade80' },
-  { name: 'En Transición', value: 33, color: '#f5c347' },
-  { name: 'Brown Assets', value: 33, color: '#ff6b6b' },
-];
+// ─── ESG classification from NGFS Phase 4 climate_beta ───────────────────────
+function betaToEsgClass(beta: number | null): 'Verde' | 'Transición' | 'Brown' {
+  if (beta == null) return 'Transición'
+  if (beta >= 1.3)  return 'Brown'
+  if (beta >= 1.0)  return 'Transición'
+  return 'Verde'
+}
 
+function computeEsgData(rows: { climate_beta: number | null }[]) {
+  const total = rows.length
+  if (total === 0) return [
+    { name: 'Verdes',         value: 0, color: '#4ade80' },
+    { name: 'En Transición',  value: 0, color: '#f5c347' },
+    { name: 'Brown Assets',   value: 0, color: '#ff6b6b' },
+  ]
+  let green = 0, transition = 0, brown = 0
+  for (const r of rows) {
+    const cls = betaToEsgClass(r.climate_beta)
+    if (cls === 'Verde')      green++
+    else if (cls === 'Brown') brown++
+    else                      transition++
+  }
+  return [
+    { name: 'Verdes',        value: Math.round((green      / total) * 100), color: '#4ade80' },
+    { name: 'En Transición', value: Math.round((transition / total) * 100), color: '#f5c347' },
+    { name: 'Brown Assets',  value: Math.round((brown      / total) * 100), color: '#ff6b6b' },
+  ]
+}
 
+// ─── Verdict helpers ──────────────────────────────────────────────────────────
+const VERDICT_COLOR: Record<VerdictAction, 'success' | 'danger' | 'primary'> = {
+  COMPRAR:  'success',
+  VENDER:   'danger',
+  MANTENER: 'primary',
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const supabase = createClient();
-  const [analyses, setAnalyses] = useState<any[]>([]);
-  const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
-  const [tickerRisk, setTickerRisk] = useState<any[]>([]);
-  const [uniqueTickerCount, setUniqueTickerCount] = useState(0);
-  const [simulationData, setSimulationData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const supabase = createClient()
+  const [analyses,         setAnalyses]         = useState<any[]>([])
+  const [latestAnalysis,   setLatestAnalysis]   = useState<any>(null)
+  const [tickerRisk,       setTickerRisk]       = useState<any[]>([])
+  const [uniqueTickerCount,setUniqueTickerCount] = useState(0)
+  const [simulationData,   setSimulationData]   = useState<any[]>([])
+  const [esgData,          setEsgData]          = useState<any[]>([])
+  const [avgBeta,          setAvgBeta]          = useState<string>('—')
+  const [loading,          setLoading]          = useState(true)
 
   async function loadDashboard() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
 
-    if (!user) {
-      setAnalyses([]);
-      setLatestAnalysis(null);
-      setTickerRisk([]);
-      setUniqueTickerCount(0);
-      setLoading(false);
-      return;
-    }
-
+    // Latest single row (for KPIs + simulation paths)
     const { data: latestRows } = await supabase
       .from('risk_analyses')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(1)
 
+    // All rows for history table
     const { data: allAnalyses } = await supabase
       .from('risk_analyses')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
 
+    // One row per ticker (latest) for CVaR bars + ESG classification
     const { data: groupedRows } = await supabase
       .from('risk_analyses')
-      .select('ticker, cvar_95, jump_prob, verdict, created_at')
+      .select('ticker, cvar_95, jump_prob, verdict_action, climate_beta, created_at')
       .eq('user_id', user.id)
-      .order('ticker', { ascending: true })
-      .order('created_at', { ascending: false });
+      .order('ticker',     { ascending: true })
+      .order('created_at', { ascending: false })
 
-    const latestByTicker = new Map<string, any>();
+    // Deduplicate: keep only latest per ticker
+    const latestByTicker = new Map<string, any>()
     for (const row of groupedRows ?? []) {
-      const ticker = row.ticker?.toUpperCase();
-      if (!ticker || latestByTicker.has(ticker)) continue;
-      latestByTicker.set(ticker, { ...row, ticker });
+      const ticker = row.ticker?.toUpperCase()
+      if (!ticker || latestByTicker.has(ticker)) continue
+      latestByTicker.set(ticker, { ...row, ticker })
+    }
+    const deduped = Array.from(latestByTicker.values())
+
+    // CVaR bars
+    const tickerRiskRows = deduped.map((row) => {
+      const cvar = Number(row.cvar_95 ?? 0)
+      return {
+        name:         row.ticker,
+        cvar,
+        climate_beta: row.climate_beta,
+        color: cvar < 10 ? '#4ade80' : cvar <= 20 ? '#f5c347' : '#ff6b6b',
+      }
+    })
+
+    // Average climate beta
+    if (deduped.length > 0) {
+      const sum = deduped.reduce((acc, r) => acc + (r.climate_beta ?? 1.0), 0)
+      setAvgBeta((sum / deduped.length).toFixed(2))
+    } else {
+      setAvgBeta('—')
     }
 
-    const tickerRiskRows = Array.from(latestByTicker.values()).map((row) => {
-      const cvar = Number(row.cvar_95 ?? 0);
-      return {
-        name: row.ticker,
-        cvar,
-        color: cvar < 10 ? '#4ade80' : cvar <= 20 ? '#f5c347' : '#ff6b6b',
-      };
-    });
+    // ESG distribution from real climate_beta values
+    setEsgData(computeEsgData(deduped))
 
-    setLatestAnalysis(latestRows?.[0] ?? null);
-    const paths = latestRows?.[0]?.simulation_paths;
+    // Monte Carlo paths from latest analysis
+    const paths = latestRows?.[0]?.simulation_paths
     if (paths?.media) {
       setSimulationData(paths.media.map((val: number, i: number) => ({
-        t: i, media: val, p95: paths.optimista[i], p5: paths.cvar_zone[i], cvar: paths.cvar_zone[i],
-      })));
+        t:     i,
+        media: val,
+        p95:   paths.optimista[i],
+        p5:    paths.cvar_zone[i],
+      })))
     } else {
-      setSimulationData([]);
+      setSimulationData([])
     }
-    setAnalyses(allAnalyses ?? []);
-    setTickerRisk(tickerRiskRows);
-    setUniqueTickerCount(tickerRiskRows.length);
-    setLoading(false);
+
+    setLatestAnalysis(latestRows?.[0] ?? null)
+    setAnalyses(allAnalyses ?? [])
+    setTickerRisk(tickerRiskRows)
+    setUniqueTickerCount(tickerRiskRows.length)
+    setLoading(false)
   }
 
   useEffect(() => {
-    loadDashboard();
-
+    loadDashboard()
     const channel = supabase
       .channel('dashboard')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, () => {
-        loadDashboard();
+        loadDashboard()
       })
-      .subscribe();
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const portfolioCVar = latestAnalysis?.cvar_95 != null ? `${latestAnalysis.cvar_95}%` : "0.0%";
-  const probShock = latestAnalysis?.jump_prob != null ? `${latestAnalysis.jump_prob}%` : "0.0%";
+  const portfolioCVar = latestAnalysis?.cvar_95 != null
+    ? `${Number(latestAnalysis.cvar_95).toFixed(1)}%`
+    : '—'
+  const probShock = latestAnalysis?.jump_prob != null
+    ? `${Number(latestAnalysis.jump_prob).toFixed(1)}%`
+    : '—'
 
   if (loading) {
     return (
@@ -112,7 +160,7 @@ export default function Dashboard() {
         </section>
         <div className="panel p-6 font-mono text-xs text-obsidian-on-var">Cargando dashboard...</div>
       </div>
-    );
+    )
   }
 
   return (
@@ -124,10 +172,30 @@ export default function Dashboard() {
         <div className="flex-1 h-[1px] bg-gradient-to-r from-obsidian-outline-var to-transparent" />
       </section>
 
+      {/* KPI Cards */}
       <div className="kpi-grid">
-        <KPICard label="CVAR 95% — ÚLTIMO ANÁLISIS" value={portfolioCVar} color="text-primary" delta={latestAnalysis?.ticker || "Pendiente"} sub="PEOR 5% ESCENARIOS" featured />
-        <KPICard label="RETORNO ESPERADO — 6M" value="+8.3%" color="text-success" delta="▲ Percentil 50" sub="AJUSTADO POR RIESGO" />
-        <KPICard label="PROB. SHOCK CLIMÁTICO" value={probShock} color="text-obsidian-on" delta="Poisson λ — anual" sub="JUMP-DIFFUSION MODEL" />
+        <KPICard
+          label="CVAR 95% — ÚLTIMO ANÁLISIS"
+          value={portfolioCVar}
+          color="text-primary"
+          delta={latestAnalysis?.ticker || 'Pendiente'}
+          sub="PEOR 5% ESCENARIOS"
+          featured
+        />
+        <KPICard
+          label="BETA CLIMÁTICO MEDIO"
+          value={avgBeta}
+          color={avgBeta !== '—' && Number(avgBeta) >= 1.3 ? 'text-danger' : avgBeta !== '—' && Number(avgBeta) < 1.0 ? 'text-success' : 'text-primary'}
+          delta="NGFS Phase 4 · Portfolio"
+          sub="MULTIPLICADOR DE RIESGO"
+        />
+        <KPICard
+          label="PROB. SHOCK CLIMÁTICO"
+          value={probShock}
+          color="text-obsidian-on"
+          delta="Poisson λ — anual"
+          sub="JUMP-DIFFUSION MODEL"
+        />
         <KPICard
           label="ACTIVOS ANALIZADOS"
           value={uniqueTickerCount.toString()}
@@ -138,49 +206,57 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Monte Carlo chart */}
         <div className="lg:col-span-2 panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center bg-obsidian-low">
             <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Monte Carlo Simulation</h3>
             <span className="font-mono text-[0.58rem] text-primary px-2 py-0.5 bg-primary/10 border border-primary/20 tracking-wider">
-              10k paths · Jump-diffusion
+              10k paths · Merton Jump-Diffusion
             </span>
           </div>
           <div className="h-[300px] w-full p-4">
             {simulationData.length === 0 ? (
               <div className="h-full flex items-center justify-center font-mono text-xs text-obsidian-on-var opacity-50 text-center px-8">
-                Ejecuta un nuevo análisis para ver la simulación Monte Carlo de tu portafolio.
+                Ejecuta un análisis vía Telegram para ver la simulación Monte Carlo.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={simulationData}>
                   <defs>
                     <linearGradient id="colorMedian" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f5c347" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#f5c347" stopOpacity={0}/>
+                      <stop offset="5%"  stopColor="#f5c347" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#f5c347" stopOpacity={0}   />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a282c" vertical={false} />
                   <XAxis dataKey="t" hide />
                   <YAxis hide domain={['auto', 'auto']} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }} itemStyle={{ color: '#e8e4e7' }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }}
+                    itemStyle={{ color: '#e8e4e7' }}
+                    formatter={(v) => [`${Number(v).toFixed(1)}`, '']}
+                    labelFormatter={(t) => `Día ${(Number(t) + 1) * 5}`}
+                  />
                   <Area type="monotone" dataKey="p95" stroke="none" fill="#4ade80" fillOpacity={0.05} />
-                  <Area type="monotone" dataKey="p5" stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
-                  <Line type="monotone" dataKey="media" stroke="#f5c347" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="p5"  stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
+                  <Area type="monotone" dataKey="media" stroke="#f5c347" strokeWidth={2} fill="url(#colorMedian)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
           <div className="p-4 border-t border-obsidian-outline-var flex gap-6">
-            <LegendItem color="bg-primary" label="Trayectoria media" />
-            <LegendItem color="bg-danger" label="Zona CVaR (peor 5%)" />
-            <LegendItem color="bg-success" label="Escenario optimista" />
+            <LegendItem color="bg-primary"  label="Trayectoria media (P50)" />
+            <LegendItem color="bg-danger"   label="Zona CVaR — peor 5%" />
+            <LegendItem color="bg-success"  label="Escenario optimista (P90)" />
           </div>
         </div>
 
+        {/* Right column */}
         <div className="space-y-6">
+          {/* CVaR per asset */}
           <div className="panel">
             <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">CVAR Por Activo</h3>
+              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">CVaR Por Activo</h3>
               <span className="text-[0.58rem] font-mono text-primary">95% ES</span>
             </div>
             <div className="p-5 space-y-4">
@@ -188,13 +264,13 @@ export default function Dashboard() {
                 <div key={ticker.name} className="space-y-1.5">
                   <div className="flex justify-between text-[0.68rem] font-mono">
                     <span className="text-obsidian-on">{ticker.name}</span>
-                    <span style={{ color: ticker.color }}>{ticker.cvar}%</span>
+                    <span style={{ color: ticker.color }}>{ticker.cvar.toFixed(1)}%</span>
                   </div>
                   <div className="h-1.5 bg-obsidian-high w-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${(ticker.cvar / 30) * 100}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
+                      animate={{ width: `${Math.min((ticker.cvar / 40) * 100, 100)}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
                       className="h-full"
                       style={{ backgroundColor: ticker.color }}
                     />
@@ -209,40 +285,61 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* ESG Classification — computed from real climate_beta */}
           <div className="panel">
             <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
               <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Clasificación ESG</h3>
-              <span className="text-[0.58rem] font-mono text-primary">CLIMATE BETA</span>
+              <span className="text-[0.58rem] font-mono text-primary">NGFS β</span>
             </div>
             <div className="p-5 space-y-3">
-              {ESG_DATA.map(item => (
-                <div key={item.name} className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5" style={{ backgroundColor: item.color }} />
-                  <span className="text-[0.78rem] text-obsidian-on-var flex-1">{item.name}</span>
-                  <span className="text-[0.68rem] font-mono text-obsidian-on">{item.value}%</span>
+              {esgData.length > 0 && esgData.every(d => d.value === 0) ? (
+                <div className="text-center py-2 text-obsidian-on-var font-mono text-xs opacity-50">
+                  Sin datos de clasificación aún.
                 </div>
-              ))}
+              ) : (
+                esgData.map(item => (
+                  <div key={item.name} className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-[0.78rem] text-obsidian-on-var flex-1">{item.name}</span>
+                      <span className="text-[0.68rem] font-mono text-obsidian-on">{item.value}%</span>
+                    </div>
+                    <div className="h-1 bg-obsidian-high w-full overflow-hidden ml-5">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${item.value}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                        className="h-full"
+                        style={{ backgroundColor: item.color, opacity: 0.6 }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Bottom panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Executive verdicts */}
         <div className="panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
             <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Veredictos Ejecutivos</h3>
             <span className="text-[0.58rem] font-mono text-primary">AGENTE IA</span>
           </div>
           <div className="p-4 space-y-3">
-            {analyses.slice(0, 3).map((a, i) => (
-              <VerdictCard
-                key={i}
-                ticker={a.ticker}
-                action={a.verdict?.includes('COMPRAR') ? 'COMPRAR' : a.verdict?.includes('VENDER') ? 'VENDER' : 'MANTENER'}
-                color={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'}
-                text={a.verdict?.split('.')[0] + '.'}
-              />
-            ))}
+            {analyses.slice(0, 3).map((a, i) => {
+              const action: VerdictAction = a.verdict_action ?? 'MANTENER'
+              const color = VERDICT_COLOR[action]
+              const text  = a.verdict_justification
+                ? a.verdict_justification.split('.')[0] + '.'
+                : '—'
+              return (
+                <VerdictCard key={i} ticker={a.ticker} action={action} color={color} text={text} />
+              )
+            })}
             {analyses.length === 0 && (
               <div className="text-center py-8 text-obsidian-on-var font-mono text-xs opacity-50">
                 Esperando análisis del Bot...
@@ -251,6 +348,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Analysis history */}
         <div className="panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
             <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Historial de Análisis</h3>
@@ -260,83 +358,103 @@ export default function Dashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-obsidian-outline-var">
-                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Ticker</th>
-                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Fecha</th>
-                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">CVAR 95%</th>
-                  <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Veredicto</th>
+                  {['Ticker', 'Fecha', 'CVaR 95%', 'Acción'].map(h => (
+                    <th key={h} className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-obsidian-outline-var/30">
-                {analyses.map((a, i) => (
-                  <HistoryRow
-                    key={i}
-                    ticker={a.ticker}
-                    date={a.created_at ? new Date(a.created_at).toLocaleDateString() : 'N/A'}
-                    cvar={`${a.cvar_95}%`}
-                    type={a.cvar_95 < 10 ? 'success' : a.cvar_95 > 20 ? 'danger' : 'primary'}
-                    verdict={a.verdict?.match(/\[(.*?)\]/)?.[1] || 'ANALIZADO'}
-                  />
-                ))}
+                {analyses.slice(0, 8).map((a, i) => {
+                  const action: VerdictAction = a.verdict_action ?? 'MANTENER'
+                  const cvarNum = Number(a.cvar_95 ?? 0)
+                  const type    = cvarNum < 10 ? 'success' : cvarNum > 20 ? 'danger' : 'primary'
+                  return (
+                    <HistoryRow
+                      key={i}
+                      ticker={a.ticker}
+                      date={a.created_at ? new Date(a.created_at).toLocaleDateString('es-CO') : '—'}
+                      cvar={`${cvarNum.toFixed(1)}%`}
+                      type={type}
+                      verdict={action}
+                    />
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-function KPICard({ label, value, color, delta, sub, featured = false }: any) {
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function KPICard({ label, value, color, delta, sub, featured = false }: {
+  label: string; value: string; color: string; delta: string; sub: string; featured?: boolean
+}) {
   return (
-    <div className={cn("bg-obsidian-low p-5 relative overflow-hidden transition-colors hover:bg-obsidian-mid", featured && "border-t-2 border-primary")}>
+    <div className={cn(
+      'bg-obsidian-low p-5 relative overflow-hidden transition-colors hover:bg-obsidian-mid',
+      featured && 'border-t-2 border-primary'
+    )}>
       <div className="font-mono text-[0.6rem] tracking-[0.14em] text-obsidian-on-var mb-2 uppercase">{label}</div>
-      <div className={cn("font-display text-2xl font-bold leading-none mb-2", color)}>{value}</div>
-      <div className={cn("font-mono text-[0.62rem] flex items-center gap-1.5", delta.includes('▼') || delta.includes('Pérdida') ? 'text-primary' : delta.includes('▲') ? 'text-success' : 'text-obsidian-on-var')}>
-        {delta}
-      </div>
+      <div className={cn('font-display text-2xl font-bold leading-none mb-2', color)}>{value}</div>
+      <div className="font-mono text-[0.62rem] text-obsidian-on-var">{delta}</div>
       <div className="font-mono text-[0.6rem] text-obsidian-outline mt-1 uppercase tracking-tight">{sub}</div>
     </div>
-  );
+  )
 }
 
-function LegendItem({ color, label }: { color: string, label: string }) {
+function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <div className={cn("w-4 h-0.5", color)} />
+      <div className={cn('w-4 h-0.5', color)} />
       <span className="font-mono text-[0.6rem] text-obsidian-on-var uppercase tracking-wider">{label}</span>
     </div>
-  );
+  )
 }
 
-function VerdictCard({ ticker, action, color, text }: any) {
-  const borderColors: any = { success: 'border-l-success', danger: 'border-l-danger', primary: 'border-l-primary' };
-  const badgeColors: any = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' };
-
+function VerdictCard({ ticker, action, color, text }: {
+  ticker: string; action: VerdictAction; color: 'success' | 'danger' | 'primary'; text: string
+}) {
+  const borderColors = { success: 'border-l-success', danger: 'border-l-danger', primary: 'border-l-primary' }
+  const badgeColors  = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' }
   return (
-    <div className={cn("p-3 bg-obsidian-mid border border-obsidian-outline-var border-l-3 grid grid-cols-[auto_1fr_auto] items-center gap-4 hover:bg-obsidian-high transition-colors", borderColors[color])}>
+    <div className={cn(
+      'p-3 bg-obsidian-mid border border-obsidian-outline-var border-l-3 grid grid-cols-[auto_1fr_auto] items-center gap-4 hover:bg-obsidian-high transition-colors',
+      borderColors[color]
+    )}>
       <div className="font-mono text-[0.75rem] font-bold tracking-widest text-obsidian-on">{ticker}</div>
-      <div className="text-[0.72rem] text-obsidian-on-var leading-snug">{text}</div>
-      <div className={cn("font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-tighter", badgeColors[color])}>{action}</div>
+      <div className="text-[0.72rem] text-obsidian-on-var leading-snug line-clamp-2">{text}</div>
+      <div className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-tighter', badgeColors[color])}>
+        {action}
+      </div>
     </div>
-  );
+  )
 }
 
-function HistoryRow({ ticker, date, cvar, type, verdict }: any) {
-  const cvarColors: any = { success: 'text-success', danger: 'text-danger', primary: 'text-primary' };
-  const badgeColors: any = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' };
-
+function HistoryRow({ ticker, date, cvar, type, verdict }: {
+  ticker: string; date: string; cvar: string; type: 'success' | 'danger' | 'primary'; verdict: VerdictAction
+}) {
+  const cvarColors  = { success: 'text-success', danger: 'text-danger', primary: 'text-primary' }
+  const badgeColors = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' }
   return (
     <tr className="hover:bg-obsidian-mid transition-colors">
       <td className="p-4 font-mono text-[0.68rem] text-obsidian-on font-bold">{ticker}</td>
       <td className="p-4 font-mono text-[0.68rem] text-obsidian-on-var">{date}</td>
-      <td className={cn("p-4 font-mono text-[0.68rem] font-bold", cvarColors[type])}>{cvar}</td>
+      <td className={cn('p-4 font-mono text-[0.68rem] font-bold', cvarColors[type])}>{cvar}</td>
       <td className="p-4">
-        <span className={cn("font-mono text-[0.58rem] font-bold px-2 py-0.5", badgeColors[type])}>{verdict}</span>
+        <span className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5', badgeColors[type])}>
+          {verdict}
+        </span>
       </td>
     </tr>
-  );
+  )
 }
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
+function cn(...inputs: (string | boolean | undefined)[]) {
+  return inputs.filter(Boolean).join(' ')
 }
