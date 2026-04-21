@@ -14,11 +14,46 @@ export default function OnboardingPage() {
   const [linked, setLinked] = useState(false)
   const [polling, setPolling] = useState(false)
 
-  useEffect(() => {
-    initUser()
-  }, [])
+  const startPolling = useCallback((uid: string) => {
+    setPolling(true)
+    // Polling cada 3 segundos para detectar vinculacion
+    const interval = setInterval(async () => {
+      const { data: profile } = await supabase.from('profiles').select('telegram_chat_id').eq('id', uid).single()
 
-  async function initUser() {
+      if (profile?.telegram_chat_id) {
+        clearInterval(interval)
+        setLinked(true)
+        setPolling(false)
+        setTimeout(() => router.push('/dashboard'), 2000)
+      }
+    }, 3000)
+
+    // Limpiar polling despues de 15 minutos (TTL del codigo)
+    setTimeout(() => {
+      clearInterval(interval)
+      setPolling(false)
+    }, 15 * 60 * 1000)
+  }, [router, supabase])
+
+  const generateCode = useCallback(async (uid: string) => {
+    setGenerating(true)
+    const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(6))
+    const code  = Array.from(bytes).map(b => CHARS[b % CHARS.length]).join('')
+
+    // Eliminar codigos anteriores no usados de este usuario
+    await supabase.from('telegram_link_codes').delete().eq('user_id', uid).eq('used', false)
+
+    const { error } = await supabase.from('telegram_link_codes').insert({ code, user_id: uid })
+
+    if (!error) {
+      setLinkCode(code)
+      startPolling(uid)
+    }
+    setGenerating(false)
+  }, [startPolling, supabase])
+
+  const initUser = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -42,46 +77,15 @@ export default function OnboardingPage() {
 
     // Auto-generar codigo al entrar
     await generateCode(user.id)
-  }
+  }, [generateCode, router, supabase])
 
-  const generateCode = useCallback(async (uid: string) => {
-    setGenerating(true)
-    const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    const bytes = crypto.getRandomValues(new Uint8Array(6))
-    const code  = Array.from(bytes).map(b => CHARS[b % CHARS.length]).join('')
+  useEffect(() => {
+    const frame = setTimeout(() => {
+      void initUser()
+    }, 0)
 
-    // Eliminar codigos anteriores no usados de este usuario
-    await supabase.from('telegram_link_codes').delete().eq('user_id', uid).eq('used', false)
-
-    const { error } = await supabase.from('telegram_link_codes').insert({ code, user_id: uid })
-
-    if (!error) {
-      setLinkCode(code)
-      startPolling(uid)
-    }
-    setGenerating(false)
-  }, [])
-
-  function startPolling(uid: string) {
-    setPolling(true)
-    // Polling cada 3 segundos para detectar vinculacion
-    const interval = setInterval(async () => {
-      const { data: profile } = await supabase.from('profiles').select('telegram_chat_id').eq('id', uid).single()
-
-      if (profile?.telegram_chat_id) {
-        clearInterval(interval)
-        setLinked(true)
-        setPolling(false)
-        setTimeout(() => router.push('/dashboard'), 2000)
-      }
-    }, 3000)
-
-    // Limpiar polling despues de 15 minutos (TTL del codigo)
-    setTimeout(() => {
-      clearInterval(interval)
-      setPolling(false)
-    }, 15 * 60 * 1000)
-  }
+    return () => clearTimeout(frame)
+  }, [initUser])
 
   async function handleSkip() {
     // Permitir saltar onboarding - pueden vincular despues en Alertas

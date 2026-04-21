@@ -20,7 +20,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="p-5 border-b border-obsidian-outline-var">
         <div className="font-mono text-[0.58rem] tracking-[0.18em] text-secondary mb-1">
-          // THE VELVETEEN PROJECT
+          {'// THE VELVETEEN PROJECT'}
         </div>
         <div className="font-display text-[0.95rem] font-bold text-obsidian-on leading-none">
           Stochasto<span className="text-primary">Green</span>

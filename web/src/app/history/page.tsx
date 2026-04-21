@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient, type VerdictAction } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -30,20 +30,7 @@ export default function HistoryPage() {
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [loading,  setLoading]  = useState(true)
 
-  useEffect(() => {
-    loadHistory()
-
-    const channel = supabase
-      .channel('history-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, (payload) => {
-        setAnalyses((prev) => [payload.new as Analysis, ...prev])
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
@@ -56,7 +43,25 @@ export default function HistoryPage() {
 
     setAnalyses(data || [])
     setLoading(false)
-  }
+  }, [router, supabase])
+
+  useEffect(() => {
+    const frame = setTimeout(() => {
+      void loadHistory()
+    }, 0)
+
+    const channel = supabase
+      .channel('history-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, (payload) => {
+        setAnalyses((prev) => [payload.new as Analysis, ...prev])
+      })
+      .subscribe()
+
+    return () => {
+      clearTimeout(frame)
+      supabase.removeChannel(channel)
+    }
+  }, [loadHistory, supabase])
 
   return (
     <TerminalShell>

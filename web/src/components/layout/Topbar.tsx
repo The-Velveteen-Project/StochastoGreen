@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export function Topbar() {
   const supabase = createClient()
@@ -11,11 +11,7 @@ export function Topbar() {
   const [displayName, setDisplayName] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
-  useEffect(() => {
-    loadUser()
-  }, [])
-
-  async function loadUser() {
+  const loadUser = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -24,7 +20,15 @@ export function Topbar() {
     const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single()
 
     setDisplayName(profile?.display_name || user.email?.split('@')[0] || 'Operador')
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const frame = setTimeout(() => {
+      void loadUser()
+    }, 0)
+
+    return () => clearTimeout(frame)
+  }, [loadUser])
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -50,7 +54,7 @@ export function Topbar() {
     <header className="topbar">
       <div className="flex items-center gap-4 min-w-0">
         <div className="font-mono text-[0.58rem] tracking-[0.18em] text-obsidian-outline uppercase whitespace-nowrap">
-          // Climate Risk Terminal
+          {'// Climate Risk Terminal'}
         </div>
         <div className="h-3 w-px bg-obsidian-outline-var/60" />
         <div className="font-display text-[0.72rem] font-semibold tracking-[0.18em] text-obsidian-on uppercase whitespace-nowrap">

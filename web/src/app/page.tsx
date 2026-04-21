@@ -130,7 +130,7 @@ export default function LandingPage() {
             className="flex flex-col gap-7"
           >
             <div className="inline-flex items-center gap-3 w-fit border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[0.6rem] tracking-[0.16em] text-obsidian-on-var uppercase">
-              <span className="text-obsidian-outline">// Climate transition risk engine</span>
+              <span className="text-obsidian-outline">{'// Climate transition risk engine'}</span>
               <span className="text-obsidian-outline-var">·</span>
               <span className="text-primary">Illustrative portfolio surface</span>
             </div>

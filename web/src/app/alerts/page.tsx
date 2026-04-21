@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient, type VerdictAction } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -52,9 +52,7 @@ export default function AlertsPage() {
   const [loading,        setLoading]        = useState(true)
   const [alerts,         setAlerts]         = useState<AlertRow[]>([])
 
-  useEffect(() => { checkTelegramStatus() }, [])
-
-  async function checkTelegramStatus() {
+  const checkTelegramStatus = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
@@ -84,7 +82,15 @@ export default function AlertsPage() {
 
     setAlerts(rows)
     setLoading(false)
-  }
+  }, [router, supabase])
+
+  useEffect(() => {
+    const frame = setTimeout(() => {
+      void checkTelegramStatus()
+    }, 0)
+
+    return () => clearTimeout(frame)
+  }, [checkTelegramStatus])
 
   async function generateLinkCode() {
     if (!userId) return

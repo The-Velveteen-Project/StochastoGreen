@@ -1,9 +1,29 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { createClient } from '@/lib/supabase';
-import type { VerdictAction } from '@/lib/supabase';
+import type { RiskAnalysis, SimulationPaths, VerdictAction } from '@/lib/supabase';
+
+type EsgDatum = {
+  name: string
+  value: number
+  color: string
+}
+
+type TickerRiskDatum = {
+  name: string
+  cvar: number
+  climate_beta: number | null
+  color: string
+}
+
+type SimulationDatum = {
+  t: number
+  media: number
+  p95: number
+  p5: number
+}
 
 // ─── ESG classification from NGFS Phase 4 climate_beta ───────────────────────
 function betaToEsgClass(beta: number | null): 'Verde' | 'Transición' | 'Brown' {
@@ -19,7 +39,7 @@ function computeEsgData(rows: { climate_beta: number | null }[]) {
     { name: 'Verdes',         value: 0, color: '#4ade80' },
     { name: 'En Transición',  value: 0, color: '#f5c347' },
     { name: 'Brown Assets',   value: 0, color: '#ff6b6b' },
-  ]
+  ] as EsgDatum[]
   let green = 0, transition = 0, brown = 0
   for (const r of rows) {
     const cls = betaToEsgClass(r.climate_beta)
@@ -44,45 +64,48 @@ const VERDICT_COLOR: Record<VerdictAction, 'success' | 'danger' | 'primary'> = {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const supabase = createClient()
-  const [analyses,         setAnalyses]         = useState<any[]>([])
-  const [latestAnalysis,   setLatestAnalysis]   = useState<any>(null)
-  const [tickerRisk,       setTickerRisk]       = useState<any[]>([])
+  const [analyses,         setAnalyses]         = useState<RiskAnalysis[]>([])
+  const [latestAnalysis,   setLatestAnalysis]   = useState<RiskAnalysis | null>(null)
+  const [tickerRisk,       setTickerRisk]       = useState<TickerRiskDatum[]>([])
   const [uniqueTickerCount,setUniqueTickerCount] = useState(0)
-  const [simulationData,   setSimulationData]   = useState<any[]>([])
-  const [esgData,          setEsgData]          = useState<any[]>([])
+  const [simulationData,   setSimulationData]   = useState<SimulationDatum[]>([])
+  const [esgData,          setEsgData]          = useState<EsgDatum[]>([])
   const [avgBeta,          setAvgBeta]          = useState<string>('—')
   const [loading,          setLoading]          = useState(true)
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
     // Latest single row (for KPIs + simulation paths)
-    const { data: latestRows } = await supabase
+    const { data: latestRowsRaw } = await supabase
       .from('risk_analyses')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
+    const latestRows = (latestRowsRaw ?? []) as RiskAnalysis[]
 
     // All rows for history table
-    const { data: allAnalyses } = await supabase
+    const { data: allAnalysesRaw } = await supabase
       .from('risk_analyses')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+    const allAnalyses = (allAnalysesRaw ?? []) as RiskAnalysis[]
 
     // One row per ticker (latest) for CVaR bars + ESG classification
-    const { data: groupedRows } = await supabase
+    const { data: groupedRowsRaw } = await supabase
       .from('risk_analyses')
       .select('ticker, cvar_95, jump_prob, verdict_action, climate_beta, created_at')
       .eq('user_id', user.id)
       .order('ticker',     { ascending: true })
       .order('created_at', { ascending: false })
+    const groupedRows = (groupedRowsRaw ?? []) as Pick<RiskAnalysis, 'ticker' | 'cvar_95' | 'jump_prob' | 'verdict_action' | 'climate_beta' | 'created_at'>[]
 
     // Deduplicate: keep only latest per ticker
-    const latestByTicker = new Map<string, any>()
-    for (const row of groupedRows ?? []) {
+    const latestByTicker = new Map<string, Pick<RiskAnalysis, 'ticker' | 'cvar_95' | 'verdict_action' | 'climate_beta' | 'created_at'>>()
+    for (const row of groupedRows) {
       const ticker = row.ticker?.toUpperCase()
       if (!ticker || latestByTicker.has(ticker)) continue
       latestByTicker.set(ticker, { ...row, ticker })
@@ -90,7 +113,7 @@ export default function Dashboard() {
     const deduped = Array.from(latestByTicker.values())
 
     // CVaR bars
-    const tickerRiskRows = deduped.map((row) => {
+    const tickerRiskRows: TickerRiskDatum[] = deduped.map((row) => {
       const cvar = Number(row.cvar_95 ?? 0)
       return {
         name:         row.ticker,
@@ -112,7 +135,7 @@ export default function Dashboard() {
     setEsgData(computeEsgData(deduped))
 
     // Monte Carlo paths from latest analysis
-    const paths = latestRows?.[0]?.simulation_paths
+    const paths = latestRows[0]?.simulation_paths as SimulationPaths | null | undefined
     if (paths?.media) {
       setSimulationData(paths.media.map((val: number, i: number) => ({
         t:     i,
@@ -125,22 +148,26 @@ export default function Dashboard() {
     }
 
     setLatestAnalysis(latestRows?.[0] ?? null)
-    setAnalyses(allAnalyses ?? [])
+    setAnalyses(allAnalyses)
     setTickerRisk(tickerRiskRows)
     setUniqueTickerCount(tickerRiskRows.length)
     setLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    loadDashboard()
+    const initialize = async () => {
+      await loadDashboard()
+    }
+    void initialize()
+
     const channel = supabase
       .channel('dashboard')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'risk_analyses' }, () => {
-        loadDashboard()
+        void loadDashboard()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [loadDashboard, supabase])
 
   const portfolioCVar = latestAnalysis?.cvar_95 != null
     ? `${Number(latestAnalysis.cvar_95).toFixed(1)}%`

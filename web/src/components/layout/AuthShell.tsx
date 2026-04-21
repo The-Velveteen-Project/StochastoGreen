@@ -27,7 +27,7 @@ export function AuthShell({
       <div className={cn('w-full', maxWidthClassName)}>
         <div className="text-center mb-10">
           <div className="font-mono text-[0.58rem] tracking-[0.18em] text-secondary uppercase mb-2">
-            // The Velveteen Project
+            {'// The Velveteen Project'}
           </div>
           <div className="font-display text-xl font-bold text-obsidian-on leading-none">{title}</div>
           {subtitle && (
