@@ -140,7 +140,8 @@ class AnalysisResponse(BaseModel):
     verdict_confidence:     float
     cvar_95:                float
     projected_jump_prob:    float
-    is_fallback:            bool   # True if SDE engine returned contingency data
+    simulation_paths:       dict | None = None   # {media, optimista, cvar_zone} — 50 points each
+    is_fallback:            bool                 # True if SDE engine returned contingency data
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +413,7 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
         verdict_confidence=verdict.confidence,
         cvar_95=float(sde_data.get("cvar_95", 0.0)),
         projected_jump_prob=float(sde_data.get("projected_jump_prob", 0.0)),
+        simulation_paths=sde_data.get("simulation_paths"),
         is_fallback=bool(sde_data.get("is_fallback", False)),
     )
 
