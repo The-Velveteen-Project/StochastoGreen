@@ -10,6 +10,24 @@
 
 ---
 
+## Family positioning
+
+StochastoGreen is a product of [The Velveteen Project](https://github.com/The-Velveteen-Project), a founder-led Applied Decision Systems Lab. Within the Velveteen family, each product carries a distinct strategic function:
+
+- **The Velveteen Project** — the parent lab and intellectual entry point.
+- **EcoAgent** — operational, applied, real-time environmental mapping.
+- **StochastoGreen** — *quantitative, austere, research-grade.* Models financial transition risk and behaves like a financial instrument.
+
+Product-facing identity:
+- **Amber-on-obsidian** palette — differentiates from the parent's teal.
+- **Dense, analytical dashboard** — data-per-pixel deliberately high, following the family guide's explicit permission for domain density.
+- **Stochastic vocabulary preserved** — Merton jump-diffusion, CVaR, NGFS Phase 4, Expected Shortfall. No dumbing down.
+- **Anti-hype posture** — rigor signaled through evidence, not through terminal theatrics.
+
+A detailed brand-coherence and pruning review lives at [`docs/stochastogreen-pruning-audit.md`](docs/stochastogreen-pruning-audit.md), aligned with the family-level [brand coherence guide](https://github.com/The-Velveteen-Project/the-velveteen-project/blob/main/docs/brand-coherence-pruning-guide.md).
+
+---
+
 ## What it does
 
 StochastoGreen evaluates how exposed a stock is to climate transition risk: regulatory shocks, carbon taxes, stranded assets, and physical climate events. Given a ticker, it runs a full quantitative pipeline and returns a structured investment verdict.
