@@ -21,7 +21,7 @@ log = logging.getLogger("stochasto_bot")
 TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
 ORCHESTRATOR_URL = os.getenv(
     "ORCHESTRATOR_URL",
-    "https://orchestator-production.up.railway.app/analyze"
+    "https://orchestrator-production.up.railway.app/analyze"
 )
 GOOGLE_API_KEY       = os.getenv("GOOGLE_API_KEY")
 SUPABASE_URL         = os.getenv("SUPABASE_URL", "")
@@ -90,8 +90,34 @@ _VERDICT_ACTION = {
 
 
 # ---------------------------------------------------------------------------
-# Supabase — link Telegram account to web dashboard profile
+# Supabase helpers
 # ---------------------------------------------------------------------------
+async def get_user_id_for_chat(chat_id: int, client: httpx.AsyncClient) -> str | None:
+    """
+    Resolves a Telegram chat_id → Supabase user UUID via the profiles table.
+    Returns None if the account is not linked or Supabase is not configured.
+    Called once per analysis session, before the ticker loop.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        return None
+    headers = {
+        "apikey":        SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+    }
+    try:
+        r = await client.get(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=headers,
+            params={"telegram_chat_id": f"eq.{chat_id}", "select": "id"},
+            timeout=8.0,
+        )
+        if r.status_code == 200 and r.json():
+            return r.json()[0]["id"]
+    except Exception as e:
+        log.warning(f"get_user_id_for_chat failed for chat_id={chat_id}: {e}")
+    return None
+
+
 async def link_telegram_account(chat_id: int, code: str, client: httpx.AsyncClient) -> bool:
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         return False
@@ -297,6 +323,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             results = []
             # Single client for all orchestrator calls in this analysis session
             async with httpx.AsyncClient(timeout=120.0) as client:
+                # Resolve Supabase user_id once — shared across all tickers
+                chat_id = update.message.from_user.id
+                user_id = await get_user_id_for_chat(chat_id, client)
+                if user_id:
+                    log.info(f"Resolved user_id={user_id} for chat_id={chat_id}")
+                else:
+                    log.warning(
+                        f"chat_id={chat_id} not linked to any Supabase account — "
+                        "analyses will be saved with user_id=null (invisible in dashboard)"
+                    )
+
                 for ticker in tickers:
                     await update.message.reply_text(
                         f"🔄 Procesando `{ticker}`\\.\\.\\.",
@@ -304,7 +341,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                     try:
                         res = await client.post(
-                            ORCHESTRATOR_URL, json={"ticker": ticker}
+                            ORCHESTRATOR_URL,
+                            json={"ticker": ticker, "user_id": user_id},
                         )
                         if res.status_code == 200:
                             d = res.json()

@@ -94,6 +94,13 @@ def _safe_get(data: dict | None, field: str, default: str = "N/A") -> str:
 
 class AnalysisRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=10)
+    user_id: str | None = Field(
+        None,
+        description=(
+            "Supabase user UUID — supplied by the bot after resolving the "
+            "Telegram chat_id → profiles lookup. None for unauthenticated calls."
+        ),
+    )
 
     @field_validator("ticker")
     @classmethod
@@ -133,7 +140,8 @@ class AnalysisResponse(BaseModel):
     verdict_confidence:     float
     cvar_95:                float
     projected_jump_prob:    float
-    is_fallback:            bool   # True if SDE engine returned contingency data
+    simulation_paths:       dict | None = None   # {media, optimista, cvar_zone} — 50 points each
+    is_fallback:            bool                 # True if SDE engine returned contingency data
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +413,7 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
         verdict_confidence=verdict.confidence,
         cvar_95=float(sde_data.get("cvar_95", 0.0)),
         projected_jump_prob=float(sde_data.get("projected_jump_prob", 0.0)),
+        simulation_paths=sde_data.get("simulation_paths"),
         is_fallback=bool(sde_data.get("is_fallback", False)),
     )
 
@@ -413,6 +422,7 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
         db = get_supabase()
         db.table("risk_analyses").insert({
             "ticker":                response.ticker,
+            "user_id":               request.user_id,        # None if Telegram not linked
             "climate_beta":          response.climate_beta,
             "cvar_95":               response.cvar_95,
             "jump_prob":             response.projected_jump_prob,
