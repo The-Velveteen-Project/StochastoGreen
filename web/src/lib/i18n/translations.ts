@@ -40,6 +40,20 @@ export const translations = {
       productName: "StochastoGreen",
       shellSubtitle: "Portfolio climate risk platform",
       topbarLabel: "// Portfolio climate risk platform",
+      meta: {
+        titleBase: "StochastoGreen",
+        description: "Plataforma de riesgo climático de portafolios con simulación estocástica y soporte estructurado para decisiones.",
+        routes: {
+          landing: "Riesgo climático del portafolio",
+          login: "Acceso",
+          register: "Crear cuenta",
+          onboarding: "Vincular Telegram",
+          dashboard: "Dashboard",
+          portfolio: "Portafolio",
+          history: "Historial",
+          alerts: "Alertas",
+        },
+      },
       backToVelveteen: "VELVETEEN.AI",
       nav: {
         dashboard: "Dashboard",
@@ -105,6 +119,17 @@ export const translations = {
           "Reduce concentración en posiciones que explican la mayor parte de la pérdida potencial antes de que el downside de cola domine el portafolio.",
         confidence: "Confianza estructurada",
         chips: ["Monte Carlo", "CVaR 95", "Estrés por escenarios"],
+      },
+      preview: {
+        fileName: "Vista_previa_producto.txt",
+        logs: [
+          "[PRODUCTO] PLATAFORMA DE RIESGO CLIMÁTICO",
+          "[MODELO] JUMP-DIFFUSION + MONTE CARLO",
+          "[SALIDA] DOWNSIDE DEL PORTAFOLIO",
+          "[ESCENARIO] NGFS ORDERLY",
+          "[LECTURA] ACCIONES SUGERIDAS",
+          "[ESTADO] MUESTRA ILUSTRATIVA",
+        ],
       },
     },
     auth: {
@@ -336,6 +361,20 @@ export const translations = {
       productName: "StochastoGreen",
       shellSubtitle: "Portfolio climate risk platform",
       topbarLabel: "// Portfolio climate risk platform",
+      meta: {
+        titleBase: "StochastoGreen",
+        description: "Portfolio climate risk platform with stochastic simulation and structured decision support.",
+        routes: {
+          landing: "Portfolio climate risk",
+          login: "Sign in",
+          register: "Create account",
+          onboarding: "Link Telegram",
+          dashboard: "Dashboard",
+          portfolio: "Portfolio",
+          history: "History",
+          alerts: "Alerts",
+        },
+      },
       backToVelveteen: "VELVETEEN.AI",
       nav: {
         dashboard: "Dashboard",
@@ -401,6 +440,17 @@ export const translations = {
           "Reduce concentration in positions driving most of the potential loss before tail downside dominates the portfolio.",
         confidence: "Structured confidence",
         chips: ["Monte Carlo", "CVaR 95", "Scenario stress"],
+      },
+      preview: {
+        fileName: "product_preview.txt",
+        logs: [
+          "[PRODUCT] CLIMATE RISK PLATFORM",
+          "[MODEL] JUMP-DIFFUSION + MONTE CARLO",
+          "[OUTPUT] PORTFOLIO DOWNSIDE",
+          "[SCENARIO] NGFS ORDERLY",
+          "[READOUT] SUGGESTED ACTIONS",
+          "[STATUS] ILLUSTRATIVE SAMPLE",
+        ],
       },
     },
     auth: {
