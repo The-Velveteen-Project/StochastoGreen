@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient }        from '@/lib/supabase'
-import { useRouter }           from 'next/navigation'
-import type { VerdictAction }  from '@/lib/supabase'
+import { createClient, type VerdictAction } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { TerminalShell } from '@/components/layout/TerminalShell'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { cn } from '@/lib/utils'
 
 type AlertRow = {
   id:             string
@@ -21,9 +24,23 @@ function severity(cvar: number | null, action: VerdictAction | null): AlertRow['
   return 'BAJA'
 }
 
-const SEV_COLOR  = { 'CRÍTICA': '#ff6b6b', 'MEDIA': '#f5c347', 'BAJA': '#4ade80' }
-const SEV_BG     = { 'CRÍTICA': '#1a0808', 'MEDIA': '#141208', 'BAJA': '#081408' }
-const SEV_BORDER = { 'CRÍTICA': '#3a1010', 'MEDIA': '#2a2210', 'BAJA': '#102210' }
+const SEVERITY_PANEL: Record<AlertRow['severity'], string> = {
+  'CRÍTICA': 'border-danger/30 bg-danger/5',
+  'MEDIA': 'border-primary/30 bg-primary/5',
+  'BAJA': 'border-success/20 bg-success/5',
+}
+
+const SEVERITY_PILL: Record<AlertRow['severity'], string> = {
+  'CRÍTICA': 'bg-danger/10 text-danger border-danger/40',
+  'MEDIA': 'bg-primary/10 text-primary border-primary/40',
+  'BAJA': 'bg-success/10 text-success border-success/30',
+}
+
+const VERDICT_BADGES: Record<VerdictAction, string> = {
+  COMPRAR: 'bg-success/10 text-success border-success/30',
+  MANTENER: 'bg-primary/10 text-primary border-primary/30',
+  VENDER: 'bg-danger/10 text-danger border-danger/30',
+}
 
 export default function AlertsPage() {
   const supabase = createClient()
@@ -88,183 +105,168 @@ export default function AlertsPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace", color: '#444' }}>Cargando...</div>
+      <TerminalShell>
+        <div className="font-mono text-[0.75rem] text-obsidian-on-var">Cargando...</div>
+      </TerminalShell>
     )
   }
 
   return (
-    <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '4px' }}>
-        SISTEMA DE ALERTAS
+    <TerminalShell>
+      <div className="mb-8">
+        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">Sistema de alertas</div>
+        <h1 className="font-display text-xl font-bold text-obsidian-on">Alertas y notificaciones</h1>
       </div>
-      <h1 style={{ color: '#e0e0e0', fontSize: '20px', fontWeight: '700', marginBottom: '32px' }}>
-        Alertas y Notificaciones
-      </h1>
 
-      {/* Telegram Link Card */}
       <div
-        style={{
-          border: `1px solid ${telegramLinked ? '#1a3a2a' : '#2a2a1a'}`,
-          background: telegramLinked ? '#0d1a12' : '#141208',
-          padding: '24px',
-          marginBottom: '24px',
-        }}
+        className={cn(
+          'panel p-6 mb-6',
+          telegramLinked ? 'border-success/25 bg-success/5' : 'border-primary/30 bg-primary/5'
+        )}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          <span style={{ fontSize: '24px' }}>{telegramLinked ? '✅' : '🔗'}</span>
-          <div>
-            <div style={{ color: '#e0e0e0', fontSize: '13px', fontWeight: '700' }}>Telegram</div>
-            <div style={{ color: telegramLinked ? '#4ade80' : '#f5c347', fontSize: '10px', letterSpacing: '2px' }}>
-              {telegramLinked ? 'VINCULADO' : 'SIN VINCULAR'}
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className={cn(
+              'w-2.5 h-2.5 rounded-full',
+              telegramLinked ? 'bg-success animate-pulse' : 'bg-primary'
+            )}
+          />
+          <div className="min-w-0">
+            <div className="font-display text-[0.95rem] font-bold text-obsidian-on">Telegram</div>
+            <div className={cn('font-mono text-[0.58rem] tracking-[0.18em] uppercase', telegramLinked ? 'text-success' : 'text-primary')}>
+              {telegramLinked ? 'Vinculado' : 'Sin vincular'}
             </div>
           </div>
         </div>
 
         {telegramLinked ? (
-          <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>
-            Tu cuenta está vinculada. Los análisis del bot se guardarán automáticamente y recibirás alertas en Telegram
-            cuando el riesgo de tus activos supere los umbrales definidos.
+          <p className="text-obsidian-on-var text-[0.85rem] leading-relaxed">
+            La cuenta está vinculada. Los análisis del bot se guardarán automáticamente y podrás recibir alertas en Telegram
+            cuando el riesgo supere umbrales definidos.
           </p>
         ) : (
-          <>
-            <p style={{ color: '#666', fontSize: '12px', marginBottom: '20px' }}>
-              Vincula tu cuenta para recibir alertas automáticas y sincronizar los análisis del bot con el dashboard.
+          <div className="space-y-4">
+            <p className="text-obsidian-on-var text-[0.85rem] leading-relaxed">
+              Vincula tu cuenta para recibir alertas automáticas y sincronizar los análisis del bot con el terminal.
             </p>
 
             {!linkCode ? (
               <button
+                type="button"
                 onClick={generateLinkCode}
                 disabled={generatingCode}
-                style={{
-                  background: generatingCode ? '#1a1a1a' : '#f5c347',
-                  color: '#0d0d0f',
-                  border: 'none',
-                  padding: '12px 24px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  letterSpacing: '2px',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  cursor: generatingCode ? 'not-allowed' : 'pointer',
-                }}
+                className="bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase px-5 py-3 hover:bg-primary-dim transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {generatingCode ? 'GENERANDO...' : 'GENERAR CÓDIGO DE VINCULACIÓN'}
+                {generatingCode ? 'Generando...' : 'Generar código de vinculación'}
               </button>
             ) : (
-              <div>
-                <div style={{ color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '12px' }}>
-                  TU CÓDIGO (válido 15 minutos):
+              <div className="space-y-3">
+                <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase">
+                  Código (válido 15 minutos)
                 </div>
-                <div
-                  style={{
-                    background: '#0d0d0f',
-                    border: '1px solid #57f1db',
-                    padding: '16px 24px',
-                    display: 'inline-block',
-                    color: '#57f1db',
-                    fontSize: '28px',
-                    fontWeight: '700',
-                    letterSpacing: '8px',
-                    marginBottom: '16px',
-                  }}
-                >
-                  {linkCode}
+
+                <div className="bg-obsidian-mid border border-obsidian-outline-var px-4 py-3 inline-flex items-center gap-3">
+                  <div className="font-mono text-[1.1rem] font-bold tracking-[0.35em] text-primary">{linkCode}</div>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(linkCode)}
+                    className="px-2.5 py-1 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-high transition-colors font-mono text-[0.6rem] tracking-widest uppercase"
+                  >
+                    Copiar
+                  </button>
                 </div>
-                <div style={{ color: '#666', fontSize: '11px' }}>
-                  Abre el bot en Telegram:{' '}
+
+                <div className="text-obsidian-on-var text-[0.85rem]">
+                  Abre el bot:{' '}
                   <a
-                    href='https://t.me/velveteen_stochasto_green_bot'
-                    target='_blank'
-                    style={{ color: '#57f1db', textDecoration: 'none' }}
+                    href="https://t.me/velveteen_stochasto_green_bot"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-secondary hover:text-obsidian-on transition-colors font-mono"
                   >
                     @velveteen_stochasto_green_bot
                   </a>{' '}
-                  y envía: <span style={{ color: '#f5c347' }}>/link {linkCode}</span>
+                  y envía: <span className="font-mono text-primary">{`/link ${linkCode}`}</span>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => {
                     setLinkCode(null)
                     checkTelegramStatus()
                   }}
-                  style={{
-                    marginTop: '16px',
-                    background: 'transparent',
-                    border: '1px solid #333',
-                    color: '#666',
-                    padding: '8px 16px',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    letterSpacing: '1px',
-                  }}
+                  className="px-4 py-2 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-mid transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
                 >
-                  YA LO HICE — VERIFICAR
+                  Verificar
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Alertas reales */}
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '16px' }}>
-        ALERTAS DE RIESGO · CVaR &gt; 10% ó VENDER
+      <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-4">
+        Alertas de riesgo · CVaR &gt; 10% o VENDER
       </div>
 
       {alerts.length === 0 ? (
-        <div style={{ border: '1px solid #1a1a1c', padding: '48px', textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>✅</div>
-          <div style={{ fontSize: '13px', color: '#4ade80', marginBottom: '8px' }}>Sin alertas activas</div>
-          <div style={{ fontSize: '11px', color: '#444' }}>
-            Todos los activos analizados tienen riesgo bajo (CVaR ≤ 10% y veredicto COMPRAR).
-          </div>
-        </div>
+        <EmptyState
+          eyebrow="ALERTAS"
+          title="Sin alertas activas"
+          description="Todos los activos analizados tienen riesgo bajo (CVaR ≤ 10% y acción COMPRAR)."
+          action={
+            <Link
+              href="/history"
+              className="px-4 py-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
+            >
+              Ver historial
+            </Link>
+          }
+        />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {alerts.map(a => {
-            const col    = SEV_COLOR[a.severity]
-            const bg     = SEV_BG[a.severity]
-            const border = SEV_BORDER[a.severity]
+        <div className="space-y-2">
+          {alerts.map((a) => {
+            const badge = a.verdict_action ? VERDICT_BADGES[a.verdict_action] : null
+            const cvarClass = a.severity === 'CRÍTICA' ? 'text-danger' : a.severity === 'MEDIA' ? 'text-primary' : 'text-success'
+
             return (
-              <div key={a.id} style={{ background: bg, border: `1px solid ${border}`, padding: '16px 20px', display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '20px' }}>
-                {/* Severity pill */}
-                <div style={{ color: col, border: `1px solid ${col}30`, padding: '2px 8px', fontSize: '9px', letterSpacing: '2px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+              <div
+                key={a.id}
+                className={cn('panel p-4 grid grid-cols-[auto_1fr_auto_auto] items-center gap-4', SEVERITY_PANEL[a.severity])}
+              >
+                <div className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest uppercase border whitespace-nowrap', SEVERITY_PILL[a.severity])}>
                   {a.severity}
                 </div>
-                {/* Ticker + meta */}
-                <div>
-                  <div style={{ color: '#57f1db', fontSize: '13px', fontWeight: '700', letterSpacing: '1px' }}>{a.ticker}</div>
-                  <div style={{ color: '#444', fontSize: '10px', marginTop: '2px' }}>
+
+                <div className="min-w-0">
+                  <div className="font-mono text-[0.75rem] font-bold tracking-widest text-secondary">{a.ticker}</div>
+                  <div className="mt-1 font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">
                     {new Date(a.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
-                    {a.climate_beta != null && <span style={{ marginLeft: '12px' }}>β={a.climate_beta.toFixed(1)}</span>}
+                    {a.climate_beta != null ? <span className="ml-3">{`beta=${a.climate_beta.toFixed(1)}`}</span> : null}
                   </div>
                 </div>
-                {/* CVaR */}
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#555', fontSize: '9px', letterSpacing: '1px' }}>CVaR 95%</div>
-                  <div style={{ color: col, fontSize: '14px', fontWeight: '700' }}>
+
+                <div className="text-right">
+                  <div className="font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">CVaR 95%</div>
+                  <div className={cn('font-mono text-[0.85rem] font-bold', cvarClass)}>
                     {a.cvar_95 != null ? `${a.cvar_95.toFixed(1)}%` : '—'}
                   </div>
                 </div>
-                {/* Verdict badge */}
-                <div>
+
+                <div className="justify-self-end">
                   {a.verdict_action ? (
-                    <span style={{ color: col, border: `1px solid ${col}40`, padding: '3px 10px', fontSize: '10px', letterSpacing: '1px', fontWeight: '700' }}>
+                    <span className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest border uppercase', badge!)}>
                       {a.verdict_action}
                     </span>
-                  ) : <span style={{ color: '#444' }}>—</span>}
+                  ) : (
+                    <span className="font-mono text-[0.72rem] text-obsidian-outline">—</span>
+                  )}
                 </div>
               </div>
             )
           })}
         </div>
       )}
-    </div>
+    </TerminalShell>
   )
 }

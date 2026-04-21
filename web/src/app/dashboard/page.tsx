@@ -348,11 +348,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Analysis history */}
         <div className="panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
             <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Historial de Análisis</h3>
-            <span className="text-[0.58rem] font-mono text-primary">SUPABASE</span>
+            <span className="text-[0.58rem] font-mono text-primary">EVENT STREAM</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">

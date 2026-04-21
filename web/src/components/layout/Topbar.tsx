@@ -1,12 +1,13 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 
 export function Topbar() {
   const supabase = createClient()
   const router = useRouter()
+  const pathname = usePathname()
   const [displayName, setDisplayName] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -32,88 +33,49 @@ export function Topbar() {
     router.refresh()
   }
 
+  const section =
+    pathname?.startsWith('/portfolio')
+      ? 'PORTAFOLIO'
+      : pathname?.startsWith('/history')
+        ? 'HISTORIAL'
+        : pathname?.startsWith('/alerts')
+          ? 'ALERTAS'
+          : pathname?.startsWith('/dashboard')
+            ? 'DASHBOARD'
+            : 'TERMINAL'
+
+  const initial = (displayName || 'Operador').trim().charAt(0).toUpperCase()
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 32px',
-        borderBottom: '1px solid #1a1a1c',
-        background: '#0d0d0f',
-        fontFamily: "'JetBrains Mono', monospace",
-      }}
-    >
-      {/* Left */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <span style={{ color: '#333', fontSize: '11px' }}>CLIMATE RISK TERMINAL</span>
-        <span style={{ color: '#2a2a2a', fontSize: '11px' }}>|</span>
-        <span style={{ color: '#444', fontSize: '11px' }}>stochasto.velveteen.app / dashboard</span>
+    <header className="topbar">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-obsidian-outline uppercase whitespace-nowrap">
+          // Climate Risk Terminal
+        </div>
+        <div className="h-3 w-px bg-obsidian-outline-var/60" />
+        <div className="font-display text-[0.72rem] font-semibold tracking-[0.18em] text-obsidian-on uppercase whitespace-nowrap">
+          {section}
+        </div>
       </div>
 
-      {/* Right */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#131315',
-            border: '1px solid #1a1a1c',
-            padding: '6px 12px',
-            fontSize: '11px',
-            color: '#888',
-          }}
-        >
-          <div
-            style={{
-              width: '20px',
-              height: '20px',
-              background: '#f5c347',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: '700',
-              color: '#0d0d0f',
-            }}
-          >
-            {displayName.charAt(0).toUpperCase()}
+      <div className="ml-auto flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-obsidian-low border border-obsidian-outline-var px-3 py-1.5">
+          <div className="w-5 h-5 bg-primary grid place-items-center font-mono text-[0.6rem] font-bold text-obsidian-bg">
+            {initial}
           </div>
-          <span>{displayName}</span>
-        </div>
-
-        <div
-          style={{
-            background: '#131315',
-            border: '1px solid #1a1a1c',
-            padding: '6px 12px',
-            fontSize: '10px',
-            color: '#444',
-            letterSpacing: '1px',
-          }}
-        >
-          MVP · v1.0.0
+          <div className="text-[0.7rem] text-obsidian-on-var font-mono max-w-[180px] truncate">
+            {displayName || 'Operador'}
+          </div>
         </div>
 
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          style={{
-            background: 'transparent',
-            border: '1px solid #2a1a1a',
-            color: '#ff6b6b',
-            padding: '6px 14px',
-            fontSize: '10px',
-            fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: '1px',
-            cursor: loggingOut ? 'not-allowed' : 'pointer',
-            opacity: loggingOut ? 0.5 : 1,
-          }}
+          className="font-mono text-[0.62rem] tracking-widest uppercase px-3 py-1.5 border border-danger/40 text-danger hover:bg-danger/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loggingOut ? '...' : 'LOGOUT'}
+          {loggingOut ? 'Saliendo...' : 'Salir'}
         </button>
       </div>
-    </div>
+    </header>
   )
 }

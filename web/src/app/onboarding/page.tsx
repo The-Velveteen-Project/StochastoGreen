@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { AuthShell } from '@/components/layout/AuthShell'
 
 export default function OnboardingPage() {
   const supabase = createClient()
@@ -90,253 +91,118 @@ export default function OnboardingPage() {
     router.push('/dashboard')
   }
 
-  const s = {
-    page: {
-      minHeight: '100vh',
-      background: '#131315',
-      display: 'flex',
-      flexDirection: 'column' as const,
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'JetBrains Mono', monospace",
-      padding: '24px',
-    },
-    card: {
-      width: '100%',
-      maxWidth: '480px',
-      border: '1px solid #222',
-      background: '#0d0d0f',
-      padding: '40px',
-    },
-  }
+  const telegramBotUrl = 'https://t.me/velveteen_stochasto_green_bot'
 
   if (linked) {
     return (
-      <div style={s.page}>
-        <div
-          style={{
-            textAlign: 'center',
-            animation: 'fadeIn 0.3s ease',
-          }}
-        >
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-          <div
-            style={{ color: '#57f1db', fontSize: '16px', fontWeight: '700', letterSpacing: '2px', marginBottom: '8px' }}
-          >
-            ¡TELEGRAM VINCULADO!
-          </div>
-          <div style={{ color: '#555', fontSize: '12px' }}>Redirigiendo al dashboard...</div>
+      <AuthShell subtitle="Onboarding" eyebrow="// Telegram">
+        <div className="space-y-3 text-center">
+          <div className="font-display text-lg font-bold text-obsidian-on">Telegram vinculado</div>
+          <div className="font-mono text-[0.72rem] text-obsidian-on-var">Redirigiendo al dashboard...</div>
         </div>
-      </div>
+      </AuthShell>
     )
   }
 
   return (
-    <div style={s.page}>
-      {/* Header */}
-      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-        <div style={{ color: '#f5c347', fontSize: '11px', letterSpacing: '4px', marginBottom: '8px' }}>
-          THE VELVETEEN PROJECT
-        </div>
-        <div style={{ color: '#57f1db', fontSize: '20px', fontWeight: '700', letterSpacing: '2px' }}>
-          STOCHASTO_GREEN
-        </div>
-      </div>
-
-      <div style={s.card}>
-        {/* Progress */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '32px' }}>
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              background: '#57f1db',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              color: '#0d0d0f',
-              fontWeight: '700',
-            }}
-          >
-            ✓
+    <AuthShell subtitle="Onboarding" eyebrow="// Paso 2 de 3" maxWidthClassName="max-w-lg">
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 grid place-items-center bg-success/15 border border-success/30 text-success font-mono text-[0.6rem] font-bold">
+            1
           </div>
-          <div style={{ flex: 1, height: '1px', background: '#2a2a2a' }} />
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              border: '1px solid #57f1db',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              color: '#57f1db',
-              fontWeight: '700',
-            }}
-          >
+          <div className="h-px flex-1 bg-obsidian-outline-var/70" />
+          <div className="w-6 h-6 grid place-items-center bg-primary/15 border border-primary/40 text-primary font-mono text-[0.6rem] font-bold">
             2
           </div>
-          <div style={{ flex: 1, height: '1px', background: '#1a1a1a' }} />
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              border: '1px solid #333',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              color: '#444',
-            }}
-          >
+          <div className="h-px flex-1 bg-obsidian-outline-var/40" />
+          <div className="w-6 h-6 grid place-items-center bg-obsidian-mid border border-obsidian-outline-var text-obsidian-outline font-mono text-[0.6rem] font-bold">
             3
           </div>
         </div>
 
-        <div style={{ color: '#57f1db', fontSize: '11px', letterSpacing: '3px', marginBottom: '8px' }}>PASO 2 DE 3</div>
-        <div style={{ color: '#e0e0e0', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Vincula Telegram</div>
-        <p style={{ color: '#666', fontSize: '12px', lineHeight: '1.8', marginBottom: '32px' }}>
-          Telegram es la interfaz principal de StochastoGreen. El bot construira tu portafolio, ejecutara los analisis y
-          te enviara alertas de riesgo directamente en el chat.
-        </p>
+        <div>
+          <div className="font-display text-lg font-bold text-obsidian-on">Vincula Telegram</div>
+          <p className="mt-2 text-obsidian-on-var text-[0.85rem] leading-relaxed">
+            Telegram es la interfaz principal de StochastoGreen. El bot construirá tu portafolio, ejecutará análisis y
+            enviará alertas de riesgo directamente en el chat.
+          </p>
+        </div>
 
         {generating ? (
-          <div style={{ color: '#444', fontSize: '12px', textAlign: 'center', padding: '24px' }}>Generando codigo...</div>
+          <div className="text-center font-mono text-[0.75rem] text-obsidian-on-var py-6">Generando código...</div>
         ) : linkCode ? (
-          <>
-            {/* Paso 1 */}
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '12px' }}>
-                PASO 1 - ABRE EL BOT
+          <div className="space-y-5">
+            <div>
+              <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
+                Paso 1 · Abrir bot
               </div>
               <a
-                href='https://t.me/velveteen_stochasto_green_bot'
-                target='_blank'
-                rel='noopener noreferrer'
-                style={{
-                  display: 'block',
-                  background: '#0a1a2a',
-                  border: '1px solid #1a3a5a',
-                  color: '#57f1db',
-                  padding: '14px 20px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  letterSpacing: '1px',
-                  textDecoration: 'none',
-                  textAlign: 'center',
-                }}
+                href={telegramBotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-obsidian-mid border border-obsidian-outline-var px-4 py-3 font-mono text-[0.75rem] text-secondary hover:bg-obsidian-high transition-colors text-center"
               >
-                → @velveteen_stochasto_green_bot
+                @velveteen_stochasto_green_bot
               </a>
             </div>
 
-            {/* Paso 2 */}
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '12px' }}>
-                PASO 2 - ENVIA ESTE COMANDO
+            <div>
+              <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
+                Paso 2 · Enviar comando
               </div>
-              <div
-                style={{
-                  background: '#0d0d0f',
-                  border: '1px solid #2a2a2a',
-                  padding: '16px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span style={{ color: '#f5c347', fontSize: '16px', fontWeight: '700', letterSpacing: '3px' }}>
-                  /link {linkCode}
-                </span>
+              <div className="bg-obsidian-mid border border-obsidian-outline-var px-4 py-3 flex items-center justify-between gap-3">
+                <div className="font-mono text-[0.95rem] font-bold tracking-widest text-primary">{`/link ${linkCode}`}</div>
                 <button
+                  type="button"
                   onClick={() => navigator.clipboard?.writeText(`/link ${linkCode}`)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #333',
-                    color: '#555',
-                    padding: '4px 10px',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
+                  className="shrink-0 px-2.5 py-1 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-high transition-colors font-mono text-[0.6rem] tracking-widest uppercase"
                 >
-                  COPIAR
+                  Copiar
                 </button>
               </div>
-              <div style={{ color: '#333', fontSize: '10px', marginTop: '8px' }}>⏱ Valido por 15 minutos</div>
+              <div className="mt-2 font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">
+                Válido 15 minutos
+              </div>
             </div>
 
-            {/* Status */}
-            <div
-              style={{
-                background: '#0a1a0a',
-                border: '1px solid #1a2a1a',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '24px',
-              }}
-            >
-              <div
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  background: polling ? '#4ade80' : '#444',
-                  borderRadius: '50%',
-                  animation: polling ? 'pulse 1.5s infinite' : 'none',
-                }}
-              />
-              <span style={{ color: polling ? '#4ade80' : '#444', fontSize: '11px' }}>
-                {polling ? 'Esperando confirmacion del bot...' : 'Listo para vincular'}
-              </span>
+            <div className="bg-success/5 border border-success/20 px-4 py-3 flex items-center gap-3">
+              <div className={`w-2 h-2 rounded-full ${polling ? 'bg-success animate-pulse' : 'bg-obsidian-outline'}`} />
+              <div className={`font-mono text-[0.7rem] ${polling ? 'text-success' : 'text-obsidian-outline'}`}>
+                {polling ? 'Esperando confirmación del bot...' : 'Listo para vincular'}
+              </div>
             </div>
 
-            {/* Regenerar */}
             <button
+              type="button"
               onClick={() => userId && generateCode(userId)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#444',
-                fontSize: '11px',
-                cursor: 'pointer',
-                fontFamily: "'JetBrains Mono', monospace",
-                textDecoration: 'underline',
-                marginBottom: '12px',
-                display: 'block',
-              }}
+              className="font-mono text-[0.68rem] text-obsidian-on-var hover:text-obsidian-on transition-colors underline"
             >
-              Generar nuevo codigo
+              Generar nuevo código
             </button>
-          </>
-        ) : null}
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <div className="font-mono text-[0.75rem] text-obsidian-on-var">No se pudo generar un código.</div>
+            <button
+              type="button"
+              onClick={() => userId && generateCode(userId)}
+              disabled={!userId}
+              className="mt-4 px-4 py-2 border border-obsidian-outline-var text-obsidian-on hover:bg-obsidian-mid transition-colors font-mono text-[0.65rem] tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
-        {/* Skip */}
         <button
+          type="button"
           onClick={handleSkip}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#333',
-            fontSize: '11px',
-            cursor: 'pointer',
-            fontFamily: "'JetBrains Mono', monospace",
-            display: 'block',
-            marginTop: '8px',
-          }}
+          className="font-mono text-[0.68rem] text-obsidian-outline hover:text-obsidian-on-var transition-colors underline"
         >
-          Saltar por ahora →
+          Saltar por ahora
         </button>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
-    </div>
+    </AuthShell>
   )
 }

@@ -73,24 +73,24 @@ export default function LandingPage() {
             </div>
             
             <div className="absolute -bottom-6 -right-6 p-4 bg-obsidian-mid border border-obsidian-outline-var font-mono text-[0.55rem] space-y-1">
-              <div className="text-secondary opacity-60">SDE CALIBRATION</div>
-              <div className="text-obsidian-on">MU: 0.12 | SIGMA: 0.25</div>
-              <div className="text-primary">LAMBDA: 0.09 (JUMP EVENT)</div>
+              <div className="text-secondary opacity-60">KOU MODEL</div>
+              <div className="text-obsidian-on">MU | SIGMA | LAMBDA</div>
+              <div className="text-primary">PARAMETERS: CONFIGURABLE</div>
             </div>
           </motion.div>
         </main>
         
         <footer className="mt-24 border-t border-obsidian-outline-var pt-8 flex flex-col md:flex-row justify-between gap-4 opacity-50">
           <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-on-var">
-            © 2026 THE VELVETEEN PROJECT // STOCHASTO_GREEN_LABS
-          </div>
-          <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-on-var">
-            SCENARIO: NGFS_PHASE4_2023 // MODEL: MERTON_JD // SEED: 42
-          </div>
-        </footer>
-      </div>
-    </div>
-  );
+            © 2026 The Velveteen Project // StochastoGreen
+	          </div>
+	          <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-on-var">
+	            MODEL: KOU JUMP-DIFFUSION // METRICS: VAR 95% / CVaR 95%
+	          </div>
+	        </footer>
+	      </div>
+	    </div>
+	  );
 }
 
 function Feature({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {

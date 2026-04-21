@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { createClient }                from '@/lib/supabase'
-import { useRouter }                   from 'next/navigation'
-import type { VerdictAction }          from '@/lib/supabase'
+import { useEffect, useRef, useState } from 'react'
+import { createClient, type VerdictAction } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { TerminalShell } from '@/components/layout/TerminalShell'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 type Asset = {
   assetId:              string        // portfolio_assets.id — usado sólo para DELETE
@@ -13,10 +14,10 @@ type Asset = {
   latest_verdict_action: VerdictAction | null
 }
 
-const VERDICT_COLORS: Record<VerdictAction, string> = {
-  COMPRAR:  '#4ade80',
-  MANTENER: '#f5c347',
-  VENDER:   '#ff6b6b',
+const VERDICT_BADGES: Record<VerdictAction, string> = {
+  COMPRAR: 'bg-success/10 text-success border-success/30',
+  MANTENER: 'bg-primary/10 text-primary border-primary/30',
+  VENDER: 'bg-danger/10 text-danger border-danger/30',
 }
 
 export default function PortfolioPage() {
@@ -164,110 +165,103 @@ export default function PortfolioPage() {
     setAssets(prev => prev.filter(a => a.assetId !== assetId))
   }
 
-  const cell: React.CSSProperties = {
-    padding:       '14px 16px',
-    borderBottom:  '1px solid #1a1a1c',
-    fontSize:      '13px',
-    fontFamily:    "'JetBrains Mono', monospace",
-    color:         '#ccc',
-    verticalAlign: 'middle',
-  }
-
   return (
-    <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '4px' }}>
-        PORTAFOLIO ACTIVO
+    <TerminalShell>
+      <div className="mb-8">
+        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">Portafolio activo</div>
+        <h1 className="font-display text-xl font-bold text-obsidian-on">Mis activos</h1>
+        <p className="mt-2 text-obsidian-on-var text-[0.85rem]">
+          Agrega activos conversando con el bot de Telegram:{' '}
+          <a
+            href="https://t.me/velveteen_stochasto_green_bot"
+            target="_blank"
+            rel="noreferrer"
+            className="text-secondary hover:text-obsidian-on transition-colors font-mono"
+          >
+            @velveteen_stochasto_green_bot
+          </a>
+          .
+        </p>
+        <div className="mt-2 font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">
+          Quitar oculta del portafolio sin borrar historial
+        </div>
       </div>
-      <h1 style={{ color: '#e0e0e0', fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>
-        Mis Activos
-      </h1>
-      <p style={{ color: '#555', fontSize: '11px', marginBottom: '32px' }}>
-        Agrega activos conversando con el bot de Telegram ·{' '}
-        <a href='https://t.me/velveteen_stochasto_green_bot' target='_blank'
-          style={{ color: '#57f1db', textDecoration: 'none' }}>
-          @velveteen_stochasto_green_bot
-        </a>
-        <span style={{ color: '#333', marginLeft: '12px' }}>
-          · QUITAR oculta del portafolio sin borrar el historial de análisis
-        </span>
-      </p>
 
       {loading ? (
-        <div style={{ color: '#444', fontSize: '12px' }}>Cargando portafolio...</div>
+        <div className="font-mono text-[0.75rem] text-obsidian-on-var">Cargando portafolio...</div>
       ) : assets.length === 0 ? (
-        <div style={{ border: '1px solid #1a1a1c', padding: '48px', textAlign: 'center', color: '#444' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>📭</div>
-          <div style={{ fontSize: '13px', marginBottom: '8px', color: '#666' }}>Sin activos en el portafolio</div>
-          <div style={{ fontSize: '11px', color: '#444' }}>
-            Habla con el bot de Telegram para analizar tus primeros activos.
-          </div>
-        </div>
+        <EmptyState
+          eyebrow="PORTAFOLIO"
+          title="Sin activos todavía"
+          description="Los activos analizados por el bot aparecerán aquí automáticamente."
+          action={
+            <a
+              href="https://t.me/velveteen_stochasto_green_bot"
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
+            >
+              Abrir bot de Telegram
+            </a>
+          }
+        />
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-              {['TICKER', 'CVaR 95%', 'VEREDICTO', 'AGREGADO', 'ACCION'].map((h) => (
-                <th key={h} style={{
-                  ...cell, color: '#555', fontSize: '10px', letterSpacing: '2px',
-                  textAlign: 'left', borderBottom: '1px solid #2a2a2a',
-                }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map((asset) => {
-              const cvar      = asset.latest_cvar
-              const cvarColor = cvar == null ? '#555' : cvar > 20 ? '#ff6b6b' : cvar > 10 ? '#f5c347' : '#4ade80'
-              return (
-                <tr key={asset.assetId} style={{ borderBottom: '1px solid #111' }}>
-                  <td style={{ ...cell, color: '#57f1db', fontWeight: '700' }}>{asset.ticker}</td>
-                  <td style={{ ...cell, color: cvarColor }}>
-                    {cvar != null ? `${cvar.toFixed(1)}%` : '—'}
-                  </td>
-                  <td style={cell}>
-                    {asset.latest_verdict_action ? (
-                      <span style={{
-                        color:         VERDICT_COLORS[asset.latest_verdict_action],
-                        border:        `1px solid ${VERDICT_COLORS[asset.latest_verdict_action]}40`,
-                        padding:       '2px 8px',
-                        fontSize:      '10px',
-                        letterSpacing: '1px',
-                        fontWeight:    '700',
-                        fontFamily:    "'JetBrains Mono', monospace",
-                      }}>
-                        {asset.latest_verdict_action}
-                      </span>
-                    ) : '—'}
-                  </td>
-                  <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
-                    {new Date(asset.added_at).toLocaleDateString('es-CO')}
-                  </td>
-                  <td style={cell}>
-                    <button
-                      onClick={() => removeTicker(asset.assetId)}
-                      title="Quitar del portafolio (el historial de análisis se conserva)"
-                      style={{
-                        background:  'transparent',
-                        border:      '1px solid #3a1a1a',
-                        color:       '#ff6b6b',
-                        padding:     '4px 10px',
-                        fontSize:    '10px',
-                        cursor:      'pointer',
-                        fontFamily:  "'JetBrains Mono', monospace",
-                        letterSpacing: '1px',
-                      }}
-                    >
-                      QUITAR
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <div className="panel overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-obsidian-outline-var">
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Ticker</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">CVaR 95%</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Acción</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Agregado</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-obsidian-outline-var/30">
+              {assets.map((asset) => {
+                const cvar = asset.latest_cvar
+                const cvarClass = cvar == null ? 'text-obsidian-outline' : cvar > 20 ? 'text-danger' : cvar > 10 ? 'text-primary' : 'text-success'
+                const verdict = asset.latest_verdict_action
+
+                return (
+                  <tr key={asset.assetId} className="hover:bg-obsidian-mid transition-colors">
+                    <td className="p-4 font-mono text-[0.72rem] text-secondary font-bold tracking-widest">
+                      {asset.ticker}
+                    </td>
+                    <td className={`p-4 font-mono text-[0.72rem] font-bold ${cvarClass}`}>
+                      {cvar != null ? `${cvar.toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="p-4">
+                      {verdict ? (
+                        <span
+                          className={`font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest border ${VERDICT_BADGES[verdict]}`}
+                        >
+                          {verdict}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[0.72rem] text-obsidian-outline">—</span>
+                      )}
+                    </td>
+                    <td className="p-4 font-mono text-[0.72rem] text-obsidian-outline">
+                      {new Date(asset.added_at).toLocaleDateString('es-CO')}
+                    </td>
+                    <td className="p-4">
+                      <button
+                        type="button"
+                        onClick={() => removeTicker(asset.assetId)}
+                        title="Quitar del portafolio (el historial de análisis se conserva)"
+                        className="px-2.5 py-1 border border-danger/40 text-danger hover:bg-danger/10 transition-colors font-mono text-[0.6rem] tracking-widest uppercase"
+                      >
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </TerminalShell>
   )
 }

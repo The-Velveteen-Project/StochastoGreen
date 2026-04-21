@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import { AuthShell } from '@/components/layout/AuthShell'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -46,183 +47,98 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#131315',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'JetBrains Mono', monospace",
-        textAlign: 'center',
-        padding: '24px',
-      }}>
-        <div style={{ color: '#57f1db', fontSize: '32px', marginBottom: '16px' }}>✓</div>
-        <div style={{ color: '#57f1db', fontSize: '13px', letterSpacing: '2px', marginBottom: '8px' }}>
-          CUENTA CREADA
+      <AuthShell
+        subtitle="Climate Risk Terminal v1.0"
+        eyebrow="// Cuenta creada"
+        footer={
+          <div className="text-center font-mono text-[0.68rem] text-obsidian-on-var">
+            Si la redirección falla,{' '}
+            <Link href="/dashboard" className="text-primary hover:text-primary-dim transition-colors">
+              abrir terminal
+            </Link>
+            .
+          </div>
+        }
+      >
+        <div className="space-y-3 text-center">
+          <div className="font-display text-lg font-bold text-obsidian-on">Operador registrado</div>
+          <div className="font-mono text-[0.72rem] text-obsidian-on-var">Redirigiendo al dashboard...</div>
         </div>
-        <div style={{ color: '#555', fontSize: '11px' }}>
-          Redirigiendo al dashboard...
-        </div>
-      </div>
+      </AuthShell>
     )
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#131315',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'JetBrains Mono', monospace",
-      padding: '24px',
-    }}>
-      {/* Header */}
-      <div style={{ marginBottom: '48px', textAlign: 'center' }}>
-        <div style={{ color: '#f5c347', fontSize: '11px', letterSpacing: '4px', marginBottom: '8px' }}>
-          THE VELVETEEN PROJECT
+    <AuthShell
+      subtitle="Nuevo operador"
+      eyebrow="// Registro"
+      footer={
+        <div className="text-center font-mono text-[0.68rem] text-obsidian-on-var">
+          ¿Ya tienes cuenta?{' '}
+          <Link href="/login" className="text-primary hover:text-primary-dim transition-colors">
+            Iniciar sesión
+          </Link>
         </div>
-        <div style={{ color: '#57f1db', fontSize: '22px', fontWeight: '700', letterSpacing: '2px' }}>
-          STOCHASTO_GREEN
-        </div>
-        <div style={{ color: '#444', fontSize: '10px', letterSpacing: '3px', marginTop: '4px' }}>
-          NUEVO OPERADOR
-        </div>
-      </div>
-
-      {/* Card */}
-      <form onSubmit={handleRegister} style={{
-        width: '100%',
-        maxWidth: '400px',
-        border: '1px solid #222',
-        background: '#0d0d0f',
-        padding: '32px',
-      }}>
-        <div style={{ color: '#57f1db', fontSize: '11px', letterSpacing: '3px', marginBottom: '32px' }}>
-          // REGISTRO
-        </div>
-
-        {/* Name */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '8px' }}>
-            NOMBRE
+      }
+    >
+      <form onSubmit={handleRegister} className="space-y-5">
+        <div>
+          <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
+            Nombre
           </label>
           <input
             type="text"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value)}
             required
             placeholder="Carlos M."
-            style={{
-              width: '100%',
-              background: '#131315',
-              border: '1px solid #2a2a2a',
-              color: '#e0e0e0',
-              padding: '12px 14px',
-              fontSize: '13px',
-              fontFamily: "'JetBrains Mono', monospace",
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
-        {/* Email */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '8px' }}>
-            EMAIL_ADDRESS
+        <div>
+          <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
+            Email
           </label>
           <input
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="usuario@empresa.com"
-            style={{
-              width: '100%',
-              background: '#131315',
-              border: '1px solid #2a2a2a',
-              color: '#e0e0e0',
-              padding: '12px 14px',
-              fontSize: '13px',
-              fontFamily: "'JetBrains Mono', monospace",
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
-        {/* Password */}
-        <div style={{ marginBottom: '28px' }}>
-          <label style={{ display: 'block', color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '8px' }}>
-            PASSWORD (mín. 8 caracteres)
+        <div>
+          <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
+            Contraseña <span className="text-obsidian-outline">(mín. 8)</span>
           </label>
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
             placeholder="••••••••••••"
-            style={{
-              width: '100%',
-              background: '#131315',
-              border: '1px solid #2a2a2a',
-              color: '#e0e0e0',
-              padding: '12px 14px',
-              fontSize: '13px',
-              fontFamily: "'JetBrains Mono', monospace",
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
-        {/* Error */}
         {error && (
-          <div style={{
-            background: '#1a0a0a',
-            border: '1px solid #5a1a1a',
-            color: '#ff6b6b',
-            padding: '10px 14px',
-            fontSize: '11px',
-            marginBottom: '20px',
-          }}>
-            ✗ {error}
+          <div className="bg-danger/10 border border-danger/40 text-danger px-3 py-2.5 font-mono text-[0.72rem]">
+            {error}
           </div>
         )}
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
-          style={{
-            width: '100%',
-            background: loading ? '#1a2a28' : '#f5c347',
-            color: '#0d0d0f',
-            border: 'none',
-            padding: '14px',
-            fontSize: '12px',
-            fontWeight: '700',
-            letterSpacing: '3px',
-            fontFamily: "'JetBrains Mono', monospace",
-            cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s',
-          }}
+          className="w-full bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase py-3 hover:bg-primary-dim transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? 'CREANDO CUENTA...' : 'REGISTRARSE →'}
+          {loading ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
-
-        {/* Footer link */}
-        <div style={{ marginTop: '24px', textAlign: 'center', color: '#444', fontSize: '11px' }}>
-          ¿Ya tienes cuenta?{' '}
-          <Link href="/login" style={{ color: '#57f1db', textDecoration: 'none' }}>
-            INICIAR_SESIÓN
-          </Link>
-        </div>
       </form>
-    </div>
+    </AuthShell>
   )
 }
