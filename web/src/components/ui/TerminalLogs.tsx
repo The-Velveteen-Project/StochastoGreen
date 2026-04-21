@@ -23,12 +23,17 @@ export function TerminalLogs() {
   useEffect(() => {
     let index = 0;
     const interval = setInterval(() => {
-      if (index < BOOT_LOGS.length) {
-        setLogs(prev => [...prev, BOOT_LOGS[index]]);
-        index++;
-      } else {
+      if (index >= BOOT_LOGS.length) {
         clearInterval(interval);
+        return;
       }
+      // Capture the log string NOW — before setLogs is called.
+      // The functional updater runs asynchronously in React 18 Concurrent Mode;
+      // closing over the mutable `index` variable means it could already be
+      // incremented past the array end by the time React executes the updater,
+      // resulting in BOOT_LOGS[index] === undefined → crash in .map().
+      const entry = BOOT_LOGS[index++];
+      setLogs(prev => [...prev, entry]);
     }, 800);
 
     return () => clearInterval(interval);
@@ -55,7 +60,7 @@ export function TerminalLogs() {
               key={i}
               initial={{ opacity: 0, x: -5 }}
               animate={{ opacity: 1, x: 0 }}
-              className={log.includes('[OK]') ? "text-success" : log.includes('[WARN]') ? "text-warn" : "text-obsidian-on-var"}
+              className={!log ? "text-obsidian-on-var" : log.includes('[OK]') ? "text-success" : log.includes('[WARN]') ? "text-warn" : "text-obsidian-on-var"}
             >
               <span className="text-obsidian-outline mr-2">[{new Date().toLocaleTimeString('es-ES', { hour12: false })}]</span>
               {log}
