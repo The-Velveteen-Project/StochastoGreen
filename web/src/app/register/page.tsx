@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { AuthShell } from '@/components/layout/AuthShell'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { dictionary } = useLanguage()
+  const { auth } = dictionary
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -48,21 +51,21 @@ export default function RegisterPage() {
   if (success) {
     return (
       <AuthShell
-        subtitle="Climate Risk Terminal v1.0"
-        eyebrow="// Cuenta creada"
+        subtitle={auth.register.subtitle}
+        eyebrow={auth.register.successEyebrow}
         footer={
           <div className="text-center font-mono text-[0.68rem] text-obsidian-on-var">
-            Si la redirección falla,{' '}
+            {auth.register.successFooterLead}{' '}
             <Link href="/dashboard" className="text-primary hover:text-primary-dim transition-colors">
-              abrir terminal
+              {auth.register.successFooterLink}
             </Link>
             .
           </div>
         }
       >
         <div className="space-y-3 text-center">
-          <div className="font-display text-lg font-bold text-obsidian-on">Operador registrado</div>
-          <div className="font-mono text-[0.72rem] text-obsidian-on-var">Redirigiendo al dashboard...</div>
+          <div className="font-display text-lg font-bold text-obsidian-on">{auth.register.successTitle}</div>
+          <div className="font-mono text-[0.72rem] text-obsidian-on-var">{auth.register.successBody}</div>
         </div>
       </AuthShell>
     )
@@ -70,13 +73,13 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      subtitle="Nuevo operador"
-      eyebrow="// Registro"
+      subtitle={auth.register.subtitle}
+      eyebrow={auth.register.eyebrow}
       footer={
         <div className="text-center font-mono text-[0.68rem] text-obsidian-on-var">
-          ¿Ya tienes cuenta?{' '}
+          {auth.register.hasAccount}{' '}
           <Link href="/login" className="text-primary hover:text-primary-dim transition-colors">
-            Iniciar sesión
+            {auth.register.link}
           </Link>
         </div>
       }
@@ -84,35 +87,35 @@ export default function RegisterPage() {
       <form onSubmit={handleRegister} className="space-y-5">
         <div>
           <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-            Nombre
+            {auth.register.name}
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            placeholder="Carlos M."
+            placeholder={auth.register.namePlaceholder}
             className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
         <div>
           <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-            Email
+            {auth.register.email}
           </label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="usuario@empresa.com"
+            placeholder={auth.register.emailPlaceholder}
             className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
         <div>
           <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-            Contraseña <span className="text-obsidian-outline">(mín. 8)</span>
+            {auth.register.password} <span className="text-obsidian-outline">{auth.register.passwordHint}</span>
           </label>
           <input
             type="password"
@@ -120,7 +123,7 @@ export default function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            placeholder="••••••••••••"
+            placeholder={auth.register.passwordPlaceholder}
             className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
@@ -136,7 +139,7 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase py-3 hover:bg-primary-dim transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+          {loading ? auth.register.submitting : auth.register.submit}
         </button>
       </form>
     </AuthShell>

@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { AuthShell } from '@/components/layout/AuthShell'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { dictionary } = useLanguage()
+  const { auth } = dictionary
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,13 +36,13 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      subtitle="Climate Risk Terminal v1.0"
-      eyebrow="// Acceso"
+      subtitle={auth.login.subtitle}
+      eyebrow={auth.login.eyebrow}
       footer={
         <div className="text-center font-mono text-[0.68rem] text-obsidian-on-var">
-          ¿Sin cuenta?{' '}
+          {auth.login.noAccount}{' '}
           <Link href="/register" className="text-primary hover:text-primary-dim transition-colors">
-            Crear cuenta
+            {auth.login.link}
           </Link>
         </div>
       }
@@ -47,28 +50,28 @@ export default function LoginPage() {
       <form onSubmit={handleLogin} className="space-y-5">
         <div>
           <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-            Email
+            {auth.login.email}
           </label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="usuario@empresa.com"
+            placeholder={auth.login.emailPlaceholder}
             className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
 
         <div>
           <label className="block font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-            Contraseña
+            {auth.login.password}
           </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            placeholder="••••••••••••"
+            placeholder={auth.login.passwordPlaceholder}
             className="w-full bg-obsidian-mid border border-obsidian-outline-var px-3 py-2.5 font-mono text-[0.85rem] text-obsidian-on placeholder:text-obsidian-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
@@ -84,7 +87,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase py-3 hover:bg-primary-dim transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? 'Autenticando...' : 'Iniciar sesión'}
+          {loading ? auth.login.submitting : auth.login.submit}
         </button>
       </form>
     </AuthShell>

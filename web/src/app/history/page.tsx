@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TerminalShell } from '@/components/layout/TerminalShell'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type Analysis = {
   id:                  string
@@ -27,6 +28,8 @@ const VERDICT_BADGES: Record<VerdictAction, string> = {
 export default function HistoryPage() {
   const supabase = createClient()
   const router   = useRouter()
+  const { dictionary, locale } = useLanguage()
+  const { history, common } = dictionary
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [loading,  setLoading]  = useState(true)
 
@@ -64,25 +67,25 @@ export default function HistoryPage() {
   }, [loadHistory, supabase])
 
   return (
-    <TerminalShell>
+      <TerminalShell>
       <div className="mb-8">
-        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">Stream · en vivo</div>
-        <h1 className="font-display text-xl font-bold text-obsidian-on">Historial de análisis</h1>
+        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">{history.eyebrow}</div>
+        <h1 className="font-display text-xl font-bold text-obsidian-on">{history.title}</h1>
       </div>
 
       {loading ? (
-        <div className="font-mono text-[0.75rem] text-obsidian-on-var">Cargando historial...</div>
+        <div className="font-mono text-[0.75rem] text-obsidian-on-var">{history.loading}</div>
       ) : analyses.length === 0 ? (
         <EmptyState
-          eyebrow="HISTORIAL"
-          title="Sin análisis registrados"
-          description="Los análisis del bot aparecerán aquí automáticamente."
+          eyebrow={history.empty.eyebrow}
+          title={history.empty.title}
+          description={history.empty.description}
           action={
             <Link
               href="/dashboard"
               className="px-4 py-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
             >
-              Ir al dashboard
+              {history.empty.action}
             </Link>
           }
         />
@@ -91,13 +94,13 @@ export default function HistoryPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-obsidian-outline-var">
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Ticker</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">CVaR 95%</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Shock prob.</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Beta climático</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Acción</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Confianza</th>
-                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">Fecha</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.ticker}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.cvar}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.shock}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.beta}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.verdict}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.confidence}</th>
+                <th className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">{history.table.date}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-obsidian-outline-var/30">
@@ -126,7 +129,7 @@ export default function HistoryPage() {
                     <td className="p-4">
                       {action ? (
                         <span className={`font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest border ${VERDICT_BADGES[action]}`}>
-                          {action}
+                          {common.verdicts[action]}
                         </span>
                       ) : (
                         <span className="font-mono text-[0.72rem] text-obsidian-outline">—</span>
@@ -145,7 +148,7 @@ export default function HistoryPage() {
                       )}
                     </td>
                     <td className="p-4 font-mono text-[0.72rem] text-obsidian-outline">
-                      {new Date(a.created_at).toLocaleString('es-CO', {
+                      {new Date(a.created_at).toLocaleString(locale, {
                         dateStyle: 'short',
                         timeStyle: 'short',
                       })}

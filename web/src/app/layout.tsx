@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,7 +20,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "StochastoGreen — Climate Portfolio Risk",
-  description: "Advanced stochastic climate risk assessment terminal for modern portfolios.",
+  description: "Portfolio climate risk platform for stochastic simulation, scenario stress, and structured decision support.",
 };
 
 export default function RootLayout({
@@ -30,12 +31,14 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
       <body className="antialiased">
-        <div className="ambient">
-          <div className="glow-tr" />
-          <div className="glow-bl" />
-        </div>
-        <div className="grid-bg" />
-        {children}
+        <AppProviders>
+          <div className="ambient">
+            <div className="glow-tr" />
+            <div className="glow-bl" />
+          </div>
+          <div className="grid-bg" />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

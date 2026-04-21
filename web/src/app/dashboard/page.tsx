@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { createClient } from '@/lib/supabase';
 import type { RiskAnalysis, SimulationPaths, VerdictAction } from '@/lib/supabase';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 type EsgDatum = {
   name: string
@@ -26,31 +27,34 @@ type SimulationDatum = {
 }
 
 // ─── ESG classification from NGFS Phase 4 climate_beta ───────────────────────
-function betaToEsgClass(beta: number | null): 'Verde' | 'Transición' | 'Brown' {
-  if (beta == null) return 'Transición'
-  if (beta >= 1.3)  return 'Brown'
-  if (beta >= 1.0)  return 'Transición'
-  return 'Verde'
+function betaToEsgClass(beta: number | null): 'green' | 'transition' | 'brown' {
+  if (beta == null) return 'transition'
+  if (beta >= 1.3)  return 'brown'
+  if (beta >= 1.0)  return 'transition'
+  return 'green'
 }
 
-function computeEsgData(rows: { climate_beta: number | null }[]) {
+function computeEsgData(
+  rows: { climate_beta: number | null }[],
+  labels: { green: string; transition: string; brown: string }
+) {
   const total = rows.length
   if (total === 0) return [
-    { name: 'Verdes',         value: 0, color: '#4ade80' },
-    { name: 'En Transición',  value: 0, color: '#f5c347' },
-    { name: 'Brown Assets',   value: 0, color: '#ff6b6b' },
+    { name: labels.green, value: 0, color: '#4ade80' },
+    { name: labels.transition, value: 0, color: '#f5c347' },
+    { name: labels.brown, value: 0, color: '#ff6b6b' },
   ] as EsgDatum[]
   let green = 0, transition = 0, brown = 0
   for (const r of rows) {
     const cls = betaToEsgClass(r.climate_beta)
-    if (cls === 'Verde')      green++
-    else if (cls === 'Brown') brown++
+    if (cls === 'green')      green++
+    else if (cls === 'brown') brown++
     else                      transition++
   }
   return [
-    { name: 'Verdes',        value: Math.round((green      / total) * 100), color: '#4ade80' },
-    { name: 'En Transición', value: Math.round((transition / total) * 100), color: '#f5c347' },
-    { name: 'Brown Assets',  value: Math.round((brown      / total) * 100), color: '#ff6b6b' },
+    { name: labels.green, value: Math.round((green / total) * 100), color: '#4ade80' },
+    { name: labels.transition, value: Math.round((transition / total) * 100), color: '#f5c347' },
+    { name: labels.brown, value: Math.round((brown / total) * 100), color: '#ff6b6b' },
   ]
 }
 
@@ -64,6 +68,8 @@ const VERDICT_COLOR: Record<VerdictAction, 'success' | 'danger' | 'primary'> = {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const supabase = createClient()
+  const { dictionary, locale } = useLanguage()
+  const { dashboard, common } = dictionary
   const [analyses,         setAnalyses]         = useState<RiskAnalysis[]>([])
   const [latestAnalysis,   setLatestAnalysis]   = useState<RiskAnalysis | null>(null)
   const [tickerRisk,       setTickerRisk]       = useState<TickerRiskDatum[]>([])
@@ -132,7 +138,7 @@ export default function Dashboard() {
     }
 
     // ESG distribution from real climate_beta values
-    setEsgData(computeEsgData(deduped))
+    setEsgData(computeEsgData(deduped, dashboard.climatePosture.labels))
 
     // Monte Carlo paths from latest analysis
     const paths = latestRows[0]?.simulation_paths as SimulationPaths | null | undefined
@@ -152,7 +158,7 @@ export default function Dashboard() {
     setTickerRisk(tickerRiskRows)
     setUniqueTickerCount(tickerRiskRows.length)
     setLoading(false)
-  }, [supabase])
+  }, [dashboard.climatePosture.labels, supabase])
 
   useEffect(() => {
     const initialize = async () => {
@@ -181,11 +187,11 @@ export default function Dashboard() {
       <div className="space-y-6">
         <section className="flex items-center gap-4">
           <div className="font-mono text-[0.62rem] tracking-[0.14em] text-primary uppercase whitespace-nowrap">
-            Visión General del Portafolio
+            {dashboard.overview}
           </div>
           <div className="flex-1 h-[1px] bg-gradient-to-r from-obsidian-outline-var to-transparent" />
         </section>
-        <div className="panel p-6 font-mono text-xs text-obsidian-on-var">Cargando dashboard...</div>
+        <div className="panel p-6 font-mono text-xs text-obsidian-on-var">{dashboard.loading}</div>
       </div>
     )
   }
@@ -194,7 +200,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <section className="flex items-center gap-4">
         <div className="font-mono text-[0.62rem] tracking-[0.14em] text-primary uppercase whitespace-nowrap">
-          Visión General del Portafolio
+          {dashboard.overview}
         </div>
         <div className="flex-1 h-[1px] bg-gradient-to-r from-obsidian-outline-var to-transparent" />
       </section>
@@ -202,33 +208,33 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="kpi-grid">
         <KPICard
-          label="CVAR 95% — ÚLTIMO ANÁLISIS"
+          label={dashboard.kpis.downside.label}
           value={portfolioCVar}
           color="text-primary"
-          delta={latestAnalysis?.ticker || 'Pendiente'}
-          sub="PEOR 5% ESCENARIOS"
+          delta={latestAnalysis?.ticker || dashboard.kpis.downside.pending}
+          sub={dashboard.kpis.downside.sub}
           featured
         />
         <KPICard
-          label="BETA CLIMÁTICO MEDIO"
+          label={dashboard.kpis.beta.label}
           value={avgBeta}
           color={avgBeta !== '—' && Number(avgBeta) >= 1.3 ? 'text-danger' : avgBeta !== '—' && Number(avgBeta) < 1.0 ? 'text-success' : 'text-primary'}
-          delta="NGFS Phase 4 · Portfolio"
-          sub="MULTIPLICADOR DE RIESGO"
+          delta={dashboard.kpis.beta.delta}
+          sub={dashboard.kpis.beta.sub}
         />
         <KPICard
-          label="PROB. SHOCK CLIMÁTICO"
+          label={dashboard.kpis.shock.label}
           value={probShock}
           color="text-obsidian-on"
-          delta="Poisson λ — anual"
-          sub="JUMP-DIFFUSION MODEL"
+          delta={dashboard.kpis.shock.delta}
+          sub={dashboard.kpis.shock.sub}
         />
         <KPICard
-          label="ACTIVOS ANALIZADOS"
+          label={dashboard.kpis.assets.label}
           value={uniqueTickerCount.toString()}
           color="text-obsidian-on"
-          delta={tickerRisk.slice(0, 3).map(a => a.name).join(' · ') || 'Sin análisis'}
-          sub="HISTORIAL ACTIVO"
+          delta={tickerRisk.slice(0, 3).map(a => a.name).join(' · ') || dashboard.kpis.assets.empty}
+          sub={dashboard.kpis.assets.sub}
         />
       </div>
 
@@ -236,15 +242,15 @@ export default function Dashboard() {
         {/* Monte Carlo chart */}
         <div className="lg:col-span-2 panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center bg-obsidian-low">
-            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Monte Carlo Simulation</h3>
+            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">{dashboard.simulation.title}</h3>
             <span className="font-mono text-[0.58rem] text-primary px-2 py-0.5 bg-primary/10 border border-primary/20 tracking-wider">
-              10k paths · Merton Jump-Diffusion
+              {dashboard.simulation.badge}
             </span>
           </div>
           <div className="h-[300px] w-full p-4">
             {simulationData.length === 0 ? (
               <div className="h-full flex items-center justify-center font-mono text-xs text-obsidian-on-var opacity-50 text-center px-8">
-                Ejecuta un análisis vía Telegram para ver la simulación Monte Carlo.
+                {dashboard.simulation.empty}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -262,7 +268,7 @@ export default function Dashboard() {
                     contentStyle={{ backgroundColor: '#1a1a1c', border: '1px solid #4a484c', fontSize: '12px' }}
                     itemStyle={{ color: '#e8e4e7' }}
                     formatter={(v) => [`${Number(v).toFixed(1)}`, '']}
-                    labelFormatter={(t) => `Día ${(Number(t) + 1) * 5}`}
+                    labelFormatter={(t) => `${dashboard.simulation.day} ${(Number(t) + 1) * 5}`}
                   />
                   <Area type="monotone" dataKey="p95" stroke="none" fill="#4ade80" fillOpacity={0.05} />
                   <Area type="monotone" dataKey="p5"  stroke="none" fill="#ff6b6b" fillOpacity={0.05} />
@@ -272,9 +278,9 @@ export default function Dashboard() {
             )}
           </div>
           <div className="p-4 border-t border-obsidian-outline-var flex gap-6">
-            <LegendItem color="bg-primary"  label="Trayectoria media (P50)" />
-            <LegendItem color="bg-danger"   label="Zona CVaR — peor 5%" />
-            <LegendItem color="bg-success"  label="Escenario optimista (P90)" />
+            <LegendItem color="bg-primary"  label={dashboard.simulation.legendMedian} />
+            <LegendItem color="bg-danger"   label={dashboard.simulation.legendTail} />
+            <LegendItem color="bg-success"  label={dashboard.simulation.legendUpside} />
           </div>
         </div>
 
@@ -283,8 +289,8 @@ export default function Dashboard() {
           {/* CVaR per asset */}
           <div className="panel">
             <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">CVaR Por Activo</h3>
-              <span className="text-[0.58rem] font-mono text-primary">95% ES</span>
+              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">{dashboard.holdings.title}</h3>
+              <span className="text-[0.58rem] font-mono text-primary">{dashboard.holdings.badge}</span>
             </div>
             <div className="p-5 space-y-4">
               {tickerRisk.map((ticker) => (
@@ -306,7 +312,7 @@ export default function Dashboard() {
               ))}
               {tickerRisk.length === 0 && (
                 <div className="text-center py-4 text-obsidian-on-var font-mono text-xs opacity-50">
-                  Sin activos analizados.
+                  {dashboard.holdings.empty}
                 </div>
               )}
             </div>
@@ -315,13 +321,13 @@ export default function Dashboard() {
           {/* ESG Classification — computed from real climate_beta */}
           <div className="panel">
             <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Clasificación ESG</h3>
-              <span className="text-[0.58rem] font-mono text-primary">NGFS β</span>
+              <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">{dashboard.climatePosture.title}</h3>
+              <span className="text-[0.58rem] font-mono text-primary">{dashboard.climatePosture.badge}</span>
             </div>
             <div className="p-5 space-y-3">
               {esgData.length > 0 && esgData.every(d => d.value === 0) ? (
                 <div className="text-center py-2 text-obsidian-on-var font-mono text-xs opacity-50">
-                  Sin datos de clasificación aún.
+                  {dashboard.climatePosture.empty}
                 </div>
               ) : (
                 esgData.map(item => (
@@ -353,8 +359,8 @@ export default function Dashboard() {
         {/* Executive verdicts */}
         <div className="panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Veredictos Ejecutivos</h3>
-            <span className="text-[0.58rem] font-mono text-primary">AGENTE IA</span>
+            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">{dashboard.verdicts.title}</h3>
+            <span className="text-[0.58rem] font-mono text-primary">{dashboard.verdicts.badge}</span>
           </div>
           <div className="p-4 space-y-3">
             {analyses.slice(0, 3).map((a, i) => {
@@ -364,12 +370,20 @@ export default function Dashboard() {
                 ? a.verdict_justification.split('.')[0] + '.'
                 : '—'
               return (
-                <VerdictCard key={i} ticker={a.ticker} action={action} color={color} text={text} confidence={a.verdict_confidence} />
+                <VerdictCard
+                  key={i}
+                  ticker={a.ticker}
+                  action={common.verdicts[action]}
+                  color={color}
+                  text={text}
+                  confidence={a.verdict_confidence}
+                  confidenceLabel={dashboard.verdicts.confidence}
+                />
               )
             })}
             {analyses.length === 0 && (
               <div className="text-center py-8 text-obsidian-on-var font-mono text-xs opacity-50">
-                Esperando análisis del Bot...
+                {dashboard.verdicts.empty}
               </div>
             )}
           </div>
@@ -377,14 +391,19 @@ export default function Dashboard() {
 
         <div className="panel">
           <div className="p-4 border-b border-obsidian-outline-var flex justify-between items-center">
-            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">Historial de Análisis</h3>
-            <span className="text-[0.58rem] font-mono text-primary">EVENT STREAM</span>
+            <h3 className="font-display text-[0.72rem] font-bold tracking-widest uppercase">{dashboard.history.title}</h3>
+            <span className="text-[0.58rem] font-mono text-primary">{dashboard.history.badge}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-obsidian-outline-var">
-                  {['Ticker', 'Fecha', 'CVaR 95%', 'Acción'].map(h => (
+                  {[
+                    dashboard.history.headers.ticker,
+                    dashboard.history.headers.date,
+                    dashboard.history.headers.cvar,
+                    dashboard.history.headers.action,
+                  ].map(h => (
                     <th key={h} className="p-4 font-mono text-[0.58rem] text-obsidian-outline tracking-wider uppercase">
                       {h}
                     </th>
@@ -400,10 +419,10 @@ export default function Dashboard() {
                     <HistoryRow
                       key={i}
                       ticker={a.ticker}
-                      date={a.created_at ? new Date(a.created_at).toLocaleDateString('es-CO') : '—'}
+                      date={a.created_at ? new Date(a.created_at).toLocaleDateString(locale) : '—'}
                       cvar={`${cvarNum.toFixed(1)}%`}
                       type={type}
-                      verdict={action}
+                      verdict={common.verdicts[action]}
                     />
                   )
                 })}
@@ -443,9 +462,9 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-function VerdictCard({ ticker, action, color, text, confidence }: {
-  ticker: string; action: VerdictAction; color: 'success' | 'danger' | 'primary'
-  text: string; confidence?: number | null
+function VerdictCard({ ticker, action, color, text, confidence, confidenceLabel }: {
+  ticker: string; action: string; color: 'success' | 'danger' | 'primary'
+  text: string; confidence?: number | null; confidenceLabel: string
 }) {
   const borderColors = { success: 'border-l-success', danger: 'border-l-danger', primary: 'border-l-primary' }
   const badgeColors  = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' }
@@ -468,7 +487,7 @@ function VerdictCard({ ticker, action, color, text, confidence }: {
           <div className="flex-1 h-[2px] bg-obsidian-outline-var rounded-full overflow-hidden">
             <div className={cn('h-full rounded-full', barColors[color])} style={{ width: `${pct}%` }} />
           </div>
-          <span className="font-mono text-[0.55rem] text-obsidian-outline shrink-0">{pct}% conf.</span>
+          <span className="font-mono text-[0.55rem] text-obsidian-outline shrink-0">{pct}% {confidenceLabel}</span>
         </div>
       )}
     </div>
@@ -476,7 +495,7 @@ function VerdictCard({ ticker, action, color, text, confidence }: {
 }
 
 function HistoryRow({ ticker, date, cvar, type, verdict }: {
-  ticker: string; date: string; cvar: string; type: 'success' | 'danger' | 'primary'; verdict: VerdictAction
+  ticker: string; date: string; cvar: string; type: 'success' | 'danger' | 'primary'; verdict: string
 }) {
   const cvarColors  = { success: 'text-success', danger: 'text-danger', primary: 'text-primary' }
   const badgeColors = { success: 'bg-success/10 text-success', danger: 'bg-danger/10 text-danger', primary: 'bg-primary/10 text-primary' }

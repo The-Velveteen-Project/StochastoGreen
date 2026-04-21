@@ -4,15 +4,19 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { AuthShell } from '@/components/layout/AuthShell'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function OnboardingPage() {
   const supabase = createClient()
   const router = useRouter()
+  const { dictionary } = useLanguage()
+  const { onboarding, common } = dictionary
   const [userId, setUserId] = useState<string | null>(null)
   const [linkCode, setLinkCode] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [linked, setLinked] = useState(false)
   const [polling, setPolling] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const startPolling = useCallback((uid: string) => {
     setPolling(true)
@@ -99,17 +103,17 @@ export default function OnboardingPage() {
 
   if (linked) {
     return (
-      <AuthShell subtitle="Onboarding" eyebrow="// Telegram">
+      <AuthShell subtitle={onboarding.subtitle} eyebrow={onboarding.successEyebrow}>
         <div className="space-y-3 text-center">
-          <div className="font-display text-lg font-bold text-obsidian-on">Telegram vinculado</div>
-          <div className="font-mono text-[0.72rem] text-obsidian-on-var">Redirigiendo al dashboard...</div>
+          <div className="font-display text-lg font-bold text-obsidian-on">{onboarding.successTitle}</div>
+          <div className="font-mono text-[0.72rem] text-obsidian-on-var">{onboarding.successBody}</div>
         </div>
       </AuthShell>
     )
   }
 
   return (
-    <AuthShell subtitle="Onboarding" eyebrow="// Paso 2 de 3" maxWidthClassName="max-w-lg">
+    <AuthShell subtitle={onboarding.subtitle} eyebrow={onboarding.eyebrow} maxWidthClassName="max-w-lg">
       <div className="space-y-6">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 grid place-items-center bg-success/15 border border-success/30 text-success font-mono text-[0.6rem] font-bold">
@@ -126,20 +130,19 @@ export default function OnboardingPage() {
         </div>
 
         <div>
-          <div className="font-display text-lg font-bold text-obsidian-on">Vincula Telegram</div>
+          <div className="font-display text-lg font-bold text-obsidian-on">{onboarding.title}</div>
           <p className="mt-2 text-obsidian-on-var text-[0.85rem] leading-relaxed">
-            Telegram es la interfaz principal de StochastoGreen. El bot construirá tu portafolio, ejecutará análisis y
-            enviará alertas de riesgo directamente en el chat.
+            {onboarding.description}
           </p>
         </div>
 
         {generating ? (
-          <div className="text-center font-mono text-[0.75rem] text-obsidian-on-var py-6">Generando código...</div>
+          <div className="text-center font-mono text-[0.75rem] text-obsidian-on-var py-6">{onboarding.generating}</div>
         ) : linkCode ? (
           <div className="space-y-5">
             <div>
               <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-                Paso 1 · Abrir bot
+                {onboarding.steps.openBot}
               </div>
               <a
                 href={telegramBotUrl}
@@ -153,27 +156,31 @@ export default function OnboardingPage() {
 
             <div>
               <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase mb-2">
-                Paso 2 · Enviar comando
+                {onboarding.steps.sendCommand}
               </div>
               <div className="bg-obsidian-mid border border-obsidian-outline-var px-4 py-3 flex items-center justify-between gap-3">
                 <div className="font-mono text-[0.95rem] font-bold tracking-widest text-primary">{`/link ${linkCode}`}</div>
                 <button
                   type="button"
-                  onClick={() => navigator.clipboard?.writeText(`/link ${linkCode}`)}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`/link ${linkCode}`)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  }}
                   className="shrink-0 px-2.5 py-1 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-high transition-colors font-mono text-[0.6rem] tracking-widest uppercase"
                 >
-                  Copiar
+                  {copied ? common.copied : common.copy}
                 </button>
               </div>
               <div className="mt-2 font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">
-                Válido 15 minutos
+                {common.linkCodeValid}
               </div>
             </div>
 
             <div className="bg-success/5 border border-success/20 px-4 py-3 flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full ${polling ? 'bg-success animate-pulse' : 'bg-obsidian-outline'}`} />
               <div className={`font-mono text-[0.7rem] ${polling ? 'text-success' : 'text-obsidian-outline'}`}>
-                {polling ? 'Esperando confirmación del bot...' : 'Listo para vincular'}
+                {polling ? onboarding.waiting : onboarding.ready}
               </div>
             </div>
 
@@ -182,19 +189,19 @@ export default function OnboardingPage() {
               onClick={() => userId && generateCode(userId)}
               className="font-mono text-[0.68rem] text-obsidian-on-var hover:text-obsidian-on transition-colors underline"
             >
-              Generar nuevo código
+              {onboarding.regenerate}
             </button>
           </div>
         ) : (
           <div className="text-center py-6">
-            <div className="font-mono text-[0.75rem] text-obsidian-on-var">No se pudo generar un código.</div>
+            <div className="font-mono text-[0.75rem] text-obsidian-on-var">{onboarding.failed}</div>
             <button
               type="button"
               onClick={() => userId && generateCode(userId)}
               disabled={!userId}
               className="mt-4 px-4 py-2 border border-obsidian-outline-var text-obsidian-on hover:bg-obsidian-mid transition-colors font-mono text-[0.65rem] tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Reintentar
+              {common.retry}
             </button>
           </div>
         )}
@@ -204,7 +211,7 @@ export default function OnboardingPage() {
           onClick={handleSkip}
           className="font-mono text-[0.68rem] text-obsidian-outline hover:text-obsidian-on-var transition-colors underline"
         >
-          Saltar por ahora
+          {onboarding.skip}
         </button>
       </div>
     </AuthShell>

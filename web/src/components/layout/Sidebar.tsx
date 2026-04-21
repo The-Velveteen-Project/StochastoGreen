@@ -1,32 +1,37 @@
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LayoutDashboard, Briefcase, History, Bell, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { name: 'DASHBOARD', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'PORTAFOLIO', href: '/portfolio', icon: Briefcase },
-  { name: 'HISTORIAL', href: '/history', icon: History },
-  { name: 'ALERTAS', href: '/alerts', icon: Bell },
-];
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const navItems = useMemo(
+    () => [
+      { name: t('shared.nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+      { name: t('shared.nav.portfolio'), href: '/portfolio', icon: Briefcase },
+      { name: t('shared.nav.history'), href: '/history', icon: History },
+      { name: t('shared.nav.alerts'), href: '/alerts', icon: Bell },
+    ],
+    [t]
+  );
 
   return (
     <aside className="sidebar">
       <div className="p-5 border-b border-obsidian-outline-var">
         <div className="font-mono text-[0.58rem] tracking-[0.18em] text-secondary mb-1">
-          {'// THE VELVETEEN PROJECT'}
+          {t('shared.family')}
         </div>
         <div className="font-display text-[0.95rem] font-bold text-obsidian-on leading-none">
           Stochasto<span className="text-primary">Green</span>
         </div>
         <div className="font-mono text-[0.58rem] tracking-[0.1em] text-obsidian-on-var mt-1">
-          CLIMATE RISK TERMINAL v1.0
+          {t('shared.shellSubtitle')}
         </div>
       </div>
 
@@ -56,18 +61,18 @@ export function Sidebar() {
           className="mt-auto flex items-center gap-3 px-5 py-2.5 font-display text-[0.72rem] font-semibold tracking-wider text-obsidian-on-var border-l-2 border-transparent hover:text-obsidian-on hover:bg-obsidian-mid"
         >
           <ArrowLeft size={16} />
-          <span>VELVETEEN.AI</span>
+          <span>{t('shared.backToVelveteen')}</span>
         </Link>
       </nav>
 
       <div className="p-4 border-t border-obsidian-outline-var space-y-2">
         <div className="font-mono text-[0.58rem] tracking-wider text-obsidian-outline flex items-center gap-2">
           <div className="w-[5px] h-[5px] rounded-full bg-primary" />
-          ENGINE · SDE
+          {t('shared.status.engine')}
         </div>
         <div className="font-mono text-[0.58rem] tracking-wider text-obsidian-outline flex items-center gap-2">
           <div className="w-[5px] h-[5px] rounded-full bg-secondary/70" />
-          FEED · MARKET DATA
+          {t('shared.status.feed')}
         </div>
       </div>
     </aside>

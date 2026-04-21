@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type SurfacePoint = {
   label: string;
@@ -14,23 +16,25 @@ type SurfacePoint = {
 
 type SurfaceKey = keyof Omit<SurfacePoint, "label">;
 
-const HERO_SIGNALS = [
-  {
-    label: "Monte Carlo",
-    value: "10k paths",
-    detail: "Scenario fan instead of a single-point estimate.",
-  },
-  {
-    label: "CVaR 95",
-    value: "Tail downside",
-    detail: "Expected shortfall under transition stress.",
-  },
-  {
-    label: "Decision layer",
-    value: "Structured verdicts",
-    detail: "Interpretation anchored in model output.",
-  },
-] as const;
+type LandingArtifact = {
+  title: string;
+  subtitle: string;
+  scenario: string;
+  chartEyebrow: string;
+  chartDescription: string;
+  cvarLabel: string;
+  legend: {
+    success: string;
+    primary: string;
+    danger: string;
+  };
+  contributionsTitle: string;
+  decisionTitle: string;
+  decisionAction: string;
+  decisionText: string;
+  confidence: string;
+  chips: readonly string[];
+};
 
 const SURFACE_SERIES: SurfacePoint[] = [
   { label: "T0", median: 100, p75: 101, p25: 99, p90: 102, p10: 98 },
@@ -74,10 +78,7 @@ function xFor(index: number) {
 
 function yFor(value: number) {
   const usableHeight = CHART.height - CHART.paddingTop - CHART.paddingBottom;
-  return (
-    CHART.paddingTop +
-    ((MAX_VALUE - value) / (MAX_VALUE - MIN_VALUE)) * usableHeight
-  );
+  return CHART.paddingTop + ((MAX_VALUE - value) / (MAX_VALUE - MIN_VALUE)) * usableHeight;
 }
 
 function buildLinePath(key: SurfaceKey) {
@@ -88,15 +89,11 @@ function buildLinePath(key: SurfaceKey) {
 }
 
 function buildBandPath(upperKey: SurfaceKey, lowerKey: SurfaceKey) {
-  const upper = SURFACE_SERIES.map(
-    (point, index) => `${xFor(index)} ${yFor(point[upperKey])}`,
-  );
-  const lower = [...SURFACE_SERIES]
-    .reverse()
-    .map((point, index) => {
-      const reversedIndex = SURFACE_SERIES.length - 1 - index;
-      return `${xFor(reversedIndex)} ${yFor(point[lowerKey])}`;
-    });
+  const upper = SURFACE_SERIES.map((point, index) => `${xFor(index)} ${yFor(point[upperKey])}`);
+  const lower = [...SURFACE_SERIES].reverse().map((point, index) => {
+    const reversedIndex = SURFACE_SERIES.length - 1 - index;
+    return `${xFor(reversedIndex)} ${yFor(point[lowerKey])}`;
+  });
 
   return `M ${upper.join(" L ")} L ${lower.join(" L ")} Z`;
 }
@@ -106,6 +103,9 @@ const INNER_BAND = buildBandPath("p75", "p25");
 const MEDIAN_LINE = buildLinePath("median");
 
 export default function LandingPage() {
+  const { dictionary } = useLanguage();
+  const { landing, shared } = dictionary;
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_24%,rgba(245,195,71,0.08),transparent_30%),radial-gradient(circle_at_84%_72%,rgba(245,195,71,0.04),transparent_26%)]" />
@@ -115,10 +115,14 @@ export default function LandingPage() {
           <div className="font-display text-xl font-bold text-obsidian-on">
             Stochasto<span className="text-primary">Green</span>
           </div>
-          <div className="hidden md:flex items-center gap-3 font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase">
-            <span>The Velveteen Project</span>
-            <span className="text-obsidian-outline-var">·</span>
-            <span className="text-primary">Portfolio Transition Risk</span>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3 font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase">
+              <span>{shared.family}</span>
+              <span className="text-obsidian-outline-var">·</span>
+              <span className="text-primary">{landing.headerTag}</span>
+            </div>
+            <LanguageToggle />
           </div>
         </header>
 
@@ -130,9 +134,9 @@ export default function LandingPage() {
             className="flex flex-col gap-7"
           >
             <div className="inline-flex items-center gap-3 w-fit border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[0.6rem] tracking-[0.16em] text-obsidian-on-var uppercase">
-              <span className="text-obsidian-outline">{'// Climate transition risk engine'}</span>
+              <span className="text-obsidian-outline">{landing.eyebrowPrefix}</span>
               <span className="text-obsidian-outline-var">·</span>
-              <span className="text-primary">Illustrative portfolio surface</span>
+              <span className="text-primary">{landing.eyebrowArtifact}</span>
             </div>
 
             <div className="space-y-4">
@@ -140,13 +144,12 @@ export default function LandingPage() {
                 Stochasto<span className="text-primary">Green</span>
               </div>
               <h1 className="max-w-[13ch] font-display text-[clamp(2.3rem,5vw,4.2rem)] font-bold leading-[0.96] tracking-[-0.03em] text-obsidian-on">
-                Transition risk, modeled for portfolio decisions.
+                {landing.headline}
               </h1>
             </div>
 
             <p className="max-w-xl text-[1rem] lg:text-[1.05rem] leading-relaxed text-obsidian-on-var">
-              StochastoGreen simulates how climate transition scenarios can affect portfolio downside exposure, combining Monte
-              Carlo paths, CVaR stress, and structured interpretation to support investment decisions.
+              {landing.description}
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -154,18 +157,18 @@ export default function LandingPage() {
                 href="/dashboard"
                 className="px-6 py-3 bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase hover:bg-primary-dim transition-colors shadow-[0_0_30px_rgba(245,195,71,0.18)]"
               >
-                Explore dashboard
+                {landing.primaryCta}
               </Link>
               <Link
                 href="/register"
                 className="px-6 py-3 border border-obsidian-outline text-obsidian-on font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase hover:bg-obsidian-mid transition-colors"
               >
-                Create account
+                {landing.secondaryCta}
               </Link>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-obsidian-outline-var">
-              {HERO_SIGNALS.map((signal) => (
+              {landing.signals.map((signal) => (
                 <div key={signal.label} className="space-y-1.5">
                   <div className="font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase">
                     {signal.label}
@@ -182,20 +185,20 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.65, delay: 0.1 }}
           >
-            <RiskArtifact />
+            <RiskArtifact artifact={landing.artifact} />
           </motion.aside>
         </main>
 
         <footer className="border-t border-obsidian-outline-var pt-6 flex flex-col md:flex-row justify-between gap-3 text-[0.6rem] font-mono tracking-[0.14em] uppercase text-obsidian-outline">
           <div>© 2026 The Velveteen Project // StochastoGreen</div>
-          <div className="text-obsidian-on-var">Monte Carlo // CVaR 95 // NGFS scenario stress</div>
+          <div className="text-obsidian-on-var">{landing.footer}</div>
         </footer>
       </div>
     </div>
   );
 }
 
-function RiskArtifact() {
+function RiskArtifact({ artifact }: { artifact: LandingArtifact }) {
   return (
     <div className="panel bg-obsidian-low/95 shadow-[0_0_42px_rgba(0,0,0,0.32)]">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(245,195,71,0.08),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))]" />
@@ -204,14 +207,14 @@ function RiskArtifact() {
         <div className="flex flex-col sm:flex-row justify-between gap-4 pb-4 border-b border-obsidian-outline-var">
           <div>
             <div className="font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase mb-2">
-              Model surface
+              {artifact.title}
             </div>
             <div className="font-display text-[0.96rem] font-semibold tracking-[0.08em] text-obsidian-on uppercase">
-              Portfolio transition stress
+              {artifact.subtitle}
             </div>
           </div>
           <div className="inline-flex items-center gap-2 h-fit px-3 py-1.5 border border-primary/25 bg-primary/5 font-mono text-[0.58rem] tracking-[0.16em] text-primary uppercase">
-            NGFS orderly 2030
+            {artifact.scenario}
           </div>
         </div>
 
@@ -219,14 +222,12 @@ function RiskArtifact() {
           <div className="flex flex-col sm:flex-row justify-between gap-3 mb-4">
             <div>
               <div className="font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase mb-1">
-                Simulation range
+                {artifact.chartEyebrow}
               </div>
-              <div className="text-[0.82rem] text-obsidian-on-var">
-                Illustrative downside path for a carbon-sensitive portfolio.
-              </div>
+              <div className="text-[0.82rem] text-obsidian-on-var">{artifact.chartDescription}</div>
             </div>
             <div className="font-mono text-[0.6rem] tracking-[0.16em] text-primary uppercase whitespace-nowrap">
-              CVaR 95% · -14.8%
+              {artifact.cvarLabel}
             </div>
           </div>
 
@@ -275,16 +276,16 @@ function RiskArtifact() {
           </svg>
 
           <div className="mt-4 flex flex-wrap gap-4">
-            <LegendSwatch label="P90 range" tone="success" />
-            <LegendSwatch label="P50 median" tone="primary" />
-            <LegendSwatch label="CVaR zone" tone="danger" />
+            <LegendSwatch label={artifact.legend.success} tone="success" />
+            <LegendSwatch label={artifact.legend.primary} tone="primary" />
+            <LegendSwatch label={artifact.legend.danger} tone="danger" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[1.08fr_0.92fr] gap-4 mt-4">
           <div className="border border-obsidian-outline-var bg-obsidian-mid/60 p-4">
             <div className="font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase mb-3">
-              Downside contribution
+              {artifact.contributionsTitle}
             </div>
             <div className="space-y-3">
               {CONTRIBUTION_ROWS.map((row) => (
@@ -308,18 +309,16 @@ function RiskArtifact() {
 
           <div className="border border-obsidian-outline-var bg-obsidian-mid/60 p-4">
             <div className="font-mono text-[0.58rem] tracking-[0.16em] text-obsidian-outline uppercase mb-3">
-              Decision layer
+              {artifact.decisionTitle}
             </div>
             <div className="inline-flex px-2.5 py-1 border border-danger/35 bg-danger/10 font-mono text-[0.58rem] font-bold tracking-[0.16em] text-danger uppercase">
-              Rebalance
+              {artifact.decisionAction}
             </div>
-            <p className="mt-3 text-[0.82rem] leading-relaxed text-obsidian-on-var">
-              Reduce concentration in carbon-intensive downside contributors before tail loss dominates portfolio drawdown.
-            </p>
+            <p className="mt-3 text-[0.82rem] leading-relaxed text-obsidian-on-var">{artifact.decisionText}</p>
 
             <div className="mt-4">
               <div className="flex items-center justify-between font-mono text-[0.58rem] tracking-[0.14em] uppercase text-obsidian-outline mb-2">
-                <span>Structured confidence</span>
+                <span>{artifact.confidence}</span>
                 <span className="text-primary">74%</span>
               </div>
               <div className="h-1.5 bg-obsidian-high overflow-hidden">
@@ -333,7 +332,7 @@ function RiskArtifact() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {["Monte Carlo", "CVaR 95", "Scenario stress"].map((chip) => (
+              {artifact.chips.map((chip) => (
                 <span
                   key={chip}
                   className="px-2 py-1 border border-obsidian-outline-var font-mono text-[0.55rem] tracking-[0.14em] text-obsidian-on-var uppercase"
@@ -356,12 +355,7 @@ function LegendSwatch({
   label: string;
   tone: "primary" | "success" | "danger";
 }) {
-  const toneClass =
-    tone === "primary"
-      ? "bg-primary"
-      : tone === "success"
-        ? "bg-success"
-        : "bg-danger";
+  const toneClass = tone === "primary" ? "bg-primary" : tone === "success" ? "bg-success" : "bg-danger";
 
   return (
     <div className="flex items-center gap-2">

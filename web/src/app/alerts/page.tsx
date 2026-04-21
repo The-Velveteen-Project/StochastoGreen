@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { TerminalShell } from '@/components/layout/TerminalShell'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type AlertRow = {
   id:             string
@@ -45,12 +46,15 @@ const VERDICT_BADGES: Record<VerdictAction, string> = {
 export default function AlertsPage() {
   const supabase = createClient()
   const router   = useRouter()
+  const { dictionary, locale } = useLanguage()
+  const { alerts: alertText, common } = dictionary
   const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null)
   const [linkCode,       setLinkCode]       = useState<string | null>(null)
   const [generatingCode, setGeneratingCode] = useState(false)
   const [userId,         setUserId]         = useState<string | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [alerts,         setAlerts]         = useState<AlertRow[]>([])
+  const [copied,         setCopied]         = useState(false)
 
   const checkTelegramStatus = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -112,7 +116,7 @@ export default function AlertsPage() {
   if (loading) {
     return (
       <TerminalShell>
-        <div className="font-mono text-[0.75rem] text-obsidian-on-var">Cargando...</div>
+        <div className="font-mono text-[0.75rem] text-obsidian-on-var">{alertText.loading}</div>
       </TerminalShell>
     )
   }
@@ -120,8 +124,8 @@ export default function AlertsPage() {
   return (
     <TerminalShell>
       <div className="mb-8">
-        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">Sistema de alertas</div>
-        <h1 className="font-display text-xl font-bold text-obsidian-on">Alertas y notificaciones</h1>
+        <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-2">{alertText.eyebrow}</div>
+        <h1 className="font-display text-xl font-bold text-obsidian-on">{alertText.title}</h1>
       </div>
 
       <div
@@ -138,22 +142,21 @@ export default function AlertsPage() {
             )}
           />
           <div className="min-w-0">
-            <div className="font-display text-[0.95rem] font-bold text-obsidian-on">Telegram</div>
+            <div className="font-display text-[0.95rem] font-bold text-obsidian-on">{alertText.telegram.title}</div>
             <div className={cn('font-mono text-[0.58rem] tracking-[0.18em] uppercase', telegramLinked ? 'text-success' : 'text-primary')}>
-              {telegramLinked ? 'Vinculado' : 'Sin vincular'}
+              {telegramLinked ? alertText.telegram.linked : alertText.telegram.unlinked}
             </div>
           </div>
         </div>
 
         {telegramLinked ? (
           <p className="text-obsidian-on-var text-[0.85rem] leading-relaxed">
-            La cuenta está vinculada. Los análisis del bot se guardarán automáticamente y podrás recibir alertas en Telegram
-            cuando el riesgo supere umbrales definidos.
+            {alertText.telegram.linkedDescription}
           </p>
         ) : (
           <div className="space-y-4">
             <p className="text-obsidian-on-var text-[0.85rem] leading-relaxed">
-              Vincula tu cuenta para recibir alertas automáticas y sincronizar los análisis del bot con el terminal.
+              {alertText.telegram.unlinkedDescription}
             </p>
 
             {!linkCode ? (
@@ -163,27 +166,31 @@ export default function AlertsPage() {
                 disabled={generatingCode}
                 className="bg-primary text-obsidian-bg font-display text-[0.72rem] font-bold tracking-[0.18em] uppercase px-5 py-3 hover:bg-primary-dim transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {generatingCode ? 'Generando...' : 'Generar código de vinculación'}
+                {generatingCode ? alertText.telegram.generating : alertText.telegram.generate}
               </button>
             ) : (
               <div className="space-y-3">
                 <div className="font-mono text-[0.6rem] tracking-widest text-obsidian-outline uppercase">
-                  Código (válido 15 minutos)
+                  {alertText.telegram.codeLabel} ({common.linkCodeValid})
                 </div>
 
                 <div className="bg-obsidian-mid border border-obsidian-outline-var px-4 py-3 inline-flex items-center gap-3">
                   <div className="font-mono text-[1.1rem] font-bold tracking-[0.35em] text-primary">{linkCode}</div>
                   <button
                     type="button"
-                    onClick={() => navigator.clipboard?.writeText(linkCode)}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(linkCode)
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 1500)
+                    }}
                     className="px-2.5 py-1 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-high transition-colors font-mono text-[0.6rem] tracking-widest uppercase"
                   >
-                    Copiar
+                    {copied ? common.copied : common.copy}
                   </button>
                 </div>
 
                 <div className="text-obsidian-on-var text-[0.85rem]">
-                  Abre el bot:{' '}
+                  {alertText.telegram.openBotLead}:{' '}
                   <a
                     href="https://t.me/velveteen_stochasto_green_bot"
                     target="_blank"
@@ -192,7 +199,7 @@ export default function AlertsPage() {
                   >
                     @velveteen_stochasto_green_bot
                   </a>{' '}
-                  y envía: <span className="font-mono text-primary">{`/link ${linkCode}`}</span>
+                  {alertText.telegram.openBotAction}: <span className="font-mono text-primary">{`/link ${linkCode}`}</span>
                 </div>
 
                 <button
@@ -203,7 +210,7 @@ export default function AlertsPage() {
                   }}
                   className="px-4 py-2 border border-obsidian-outline-var text-obsidian-on-var hover:text-obsidian-on hover:bg-obsidian-mid transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
                 >
-                  Verificar
+                  {common.verify}
                 </button>
               </div>
             )}
@@ -212,20 +219,20 @@ export default function AlertsPage() {
       </div>
 
       <div className="font-mono text-[0.58rem] tracking-[0.18em] text-primary uppercase mb-4">
-        Alertas de riesgo · CVaR &gt; 10% o VENDER
+        {alertText.activeRule}
       </div>
 
       {alerts.length === 0 ? (
         <EmptyState
-          eyebrow="ALERTAS"
-          title="Sin alertas activas"
-          description="Todos los activos analizados tienen riesgo bajo (CVaR ≤ 10% y acción COMPRAR)."
+          eyebrow={alertText.empty.eyebrow}
+          title={alertText.empty.title}
+          description={alertText.empty.description}
           action={
             <Link
               href="/history"
               className="px-4 py-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors font-mono text-[0.65rem] tracking-widest uppercase"
             >
-              Ver historial
+              {alertText.empty.action}
             </Link>
           }
         />
@@ -241,19 +248,23 @@ export default function AlertsPage() {
                 className={cn('panel p-4 grid grid-cols-[auto_1fr_auto_auto] items-center gap-4', SEVERITY_PANEL[a.severity])}
               >
                 <div className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest uppercase border whitespace-nowrap', SEVERITY_PILL[a.severity])}>
-                  {a.severity}
+                  {a.severity === 'CRÍTICA'
+                    ? common.severity.critical
+                    : a.severity === 'MEDIA'
+                      ? common.severity.medium
+                      : common.severity.low}
                 </div>
 
                 <div className="min-w-0">
                   <div className="font-mono text-[0.75rem] font-bold tracking-widest text-secondary">{a.ticker}</div>
                   <div className="mt-1 font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">
-                    {new Date(a.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
-                    {a.climate_beta != null ? <span className="ml-3">{`beta=${a.climate_beta.toFixed(1)}`}</span> : null}
+                    {new Date(a.created_at).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}
+                    {a.climate_beta != null ? <span className="ml-3">{`${alertText.card.beta}=${a.climate_beta.toFixed(1)}`}</span> : null}
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">CVaR 95%</div>
+                  <div className="font-mono text-[0.58rem] tracking-widest text-obsidian-outline uppercase">{alertText.card.cvar}</div>
                   <div className={cn('font-mono text-[0.85rem] font-bold', cvarClass)}>
                     {a.cvar_95 != null ? `${a.cvar_95.toFixed(1)}%` : '—'}
                   </div>
@@ -262,7 +273,7 @@ export default function AlertsPage() {
                 <div className="justify-self-end">
                   {a.verdict_action ? (
                     <span className={cn('font-mono text-[0.58rem] font-bold px-2 py-0.5 tracking-widest border uppercase', badge!)}>
-                      {a.verdict_action}
+                      {common.verdicts[a.verdict_action]}
                     </span>
                   ) : (
                     <span className="font-mono text-[0.72rem] text-obsidian-outline">—</span>
