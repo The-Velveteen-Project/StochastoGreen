@@ -60,7 +60,7 @@ flowchart TB
     U -->|"Telegram: /analizar AAPL"| TG
     U -->|"Browser"| WEB
     TG -->|"HTTP POST /analyze"| ORC
-    ORC -->|"HTTP POST /simulate"| SDE
+    ORC -->|"HTTP POST /simulate_climate_risk"| SDE
     SDE <-->|"download(ticker, period=5y)"| YF
     SDE -->|"cvar_95 · jump_prob\nclimate_beta · simulation_paths"| ORC
     ORC -->|"asyncio.gather"| AF

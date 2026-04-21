@@ -94,6 +94,13 @@ def _safe_get(data: dict | None, field: str, default: str = "N/A") -> str:
 
 class AnalysisRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=10)
+    user_id: str | None = Field(
+        None,
+        description=(
+            "Supabase user UUID — supplied by the bot after resolving the "
+            "Telegram chat_id → profiles lookup. None for unauthenticated calls."
+        ),
+    )
 
     @field_validator("ticker")
     @classmethod
@@ -413,6 +420,7 @@ async def analyze(request: AnalysisRequest) -> AnalysisResponse:
         db = get_supabase()
         db.table("risk_analyses").insert({
             "ticker":                response.ticker,
+            "user_id":               request.user_id,        # None if Telegram not linked
             "climate_beta":          response.climate_beta,
             "cvar_95":               response.cvar_95,
             "jump_prob":             response.projected_jump_prob,
