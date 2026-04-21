@@ -11,6 +11,7 @@ import { Topbar }              from '@/components/layout/Topbar'
  * Guards the entire /dashboard/** subtree:
  *   - No session    → /login
  *   - No Telegram   → /onboarding
+ *   - Supabase down → /login  (fail-safe: at least sends a response)
  */
 export default async function DashboardLayout({
   children,
@@ -20,17 +21,31 @@ export default async function DashboardLayout({
   const supabase = await createClient()
 
   // getUser() validates the JWT against Supabase Auth — secure, not optimistic.
-  const { data: { user } } = await supabase.auth.getUser()
+  // Wrapped in try/catch so a Supabase outage redirects instead of hanging.
+  let user: { id: string } | null = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    // Supabase Auth unreachable — treat as unauthenticated.
+    redirect('/login')
+  }
   if (!user) redirect('/login')
 
   // Telegram link check — required to access the dashboard.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('telegram_chat_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.telegram_chat_id) redirect('/onboarding')
+  let telegramLinked = false
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('telegram_chat_id')
+      .eq('id', user.id)
+      .single()
+    telegramLinked = !!profile?.telegram_chat_id
+  } catch {
+    // DB unreachable — send to onboarding; they can retry from there.
+    redirect('/onboarding')
+  }
+  if (!telegramLinked) redirect('/onboarding')
 
   return (
     <div className="app">
