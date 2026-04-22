@@ -60,14 +60,10 @@ export function Sidebar() {
         </Link>
       </nav>
 
-      <div className="p-4 border-t border-obsidian-outline-var space-y-2">
+      <div className="p-4 border-t border-obsidian-outline-var">
         <div className="font-mono text-[0.58rem] tracking-wider text-obsidian-outline flex items-center gap-2">
           <div className="w-[5px] h-[5px] rounded-full bg-success animate-pulse" />
           SDE_ENGINE · ONLINE
-        </div>
-        <div className="font-mono text-[0.58rem] tracking-wider text-obsidian-outline flex items-center gap-2">
-          <div className="w-[5px] h-[5px] rounded-full bg-primary animate-pulse" />
-          ALPHAVANTAGE · 25 REQ/DAY
         </div>
       </div>
     </aside>

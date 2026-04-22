@@ -17,9 +17,9 @@ type Analysis = {
 }
 
 const VERDICT_COLORS: Record<VerdictAction, string> = {
-  COMPRAR:  '#4ade80',
-  MANTENER: '#f5c347',
-  VENDER:   '#ff6b6b',
+  COMPRAR:  'text-success border-success/40',
+  MANTENER: 'text-warn border-warn/40',
+  VENDER:   'text-danger border-danger/40',
 }
 
 export default function HistoryPage() {
@@ -56,98 +56,78 @@ export default function HistoryPage() {
     setLoading(false)
   }
 
-  const cell: React.CSSProperties = {
-    padding:      '12px 16px',
-    borderBottom: '1px solid #111',
-    fontSize:     '12px',
-    fontFamily:   "'JetBrains Mono', monospace",
-    color:        '#ccc',
-    verticalAlign: 'middle',
-  }
+  const cellClass = 'px-4 py-3 border-b border-obsidian-outline-var/50 text-[12px] font-mono text-obsidian-on-var align-middle'
+  const headClass = 'px-4 py-3 border-b border-obsidian-outline-var text-[10px] tracking-[0.2em] text-obsidian-outline text-left font-mono'
 
   return (
-    <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '4px' }}>
-        SUPABASE · TIEMPO REAL
+    <div className="p-8 font-mono">
+      <div className="text-primary text-[10px] tracking-[0.28em] mb-1">
+        HISTORIAL DE ANÁLISIS
       </div>
-      <h1 style={{ color: '#e0e0e0', fontSize: '20px', fontWeight: '700', marginBottom: '32px' }}>
-        Historial de Análisis
+      <h1 className="text-obsidian-on text-[20px] font-bold mb-8">
+        Análisis recientes
       </h1>
 
       {loading ? (
-        <div style={{ color: '#444', fontSize: '12px' }}>Cargando historial...</div>
+        <div className="text-obsidian-outline text-[12px]">Cargando historial...</div>
       ) : analyses.length === 0 ? (
-        <div style={{ border: '1px solid #1a1a1c', padding: '48px', textAlign: 'center', color: '#444' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>📋</div>
-          <div style={{ fontSize: '13px', color: '#666' }}>Sin análisis registrados aún</div>
-          <div style={{ fontSize: '11px', marginTop: '8px', color: '#444' }}>
+        <div className="border border-obsidian-outline-var p-12 text-center">
+          <div className="text-obsidian-on-var text-[13px] mb-2">Sin análisis registrados</div>
+          <div className="text-obsidian-outline text-[11px]">
             Los análisis del bot aparecerán aquí automáticamente.
           </div>
         </div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="w-full border-collapse">
           <thead>
             <tr>
-              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'BETA CLIMÁTICO', 'ACCIÓN', 'CONFIANZA', 'FECHA'].map((h) => (
-                <th key={h} style={{
-                  ...cell,
-                  color: '#555', fontSize: '10px', letterSpacing: '2px',
-                  textAlign: 'left', borderBottom: '1px solid #2a2a2a',
-                }}>
-                  {h}
-                </th>
+              {['TICKER', 'CVaR 95%', 'SHOCK PROB.', 'β CLIMÁTICO', 'ACCIÓN', 'CONFIANZA', 'FECHA'].map((h) => (
+                <th key={h} className={headClass}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {analyses.map((a) => {
               const cvar       = a.cvar_95
-              const cvarColor  = cvar == null ? '#555' : cvar > 20 ? '#ff6b6b' : cvar > 10 ? '#f5c347' : '#4ade80'
+              const cvarClass  = cvar == null ? 'text-obsidian-outline' : cvar > 20 ? 'text-danger' : cvar > 10 ? 'text-warn' : 'text-success'
               const action     = a.verdict_action
-              const actionColor = action ? VERDICT_COLORS[action] : '#555'
               return (
                 <tr key={a.id}>
-                  <td style={{ ...cell, color: '#57f1db', fontWeight: '700' }}>{a.ticker}</td>
-                  <td style={{ ...cell, color: cvarColor }}>
+                  <td className={`${cellClass} text-primary font-bold`}>{a.ticker}</td>
+                  <td className={`${cellClass} ${cvarClass}`}>
                     {cvar != null ? `${cvar.toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ ...cell, color: '#888' }}>
+                  <td className={cellClass}>
                     {a.jump_prob != null ? `${a.jump_prob.toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ ...cell, color: '#888' }}>
+                  <td className={cellClass}>
                     {a.climate_beta != null ? a.climate_beta.toFixed(1) : '—'}
                   </td>
-                  <td style={{ ...cell }}>
+                  <td className={cellClass}>
                     {action ? (
-                      <span style={{
-                        color:        actionColor,
-                        border:       `1px solid ${actionColor}40`,
-                        padding:      '2px 8px',
-                        fontSize:     '10px',
-                        letterSpacing: '1px',
-                        fontWeight:   '700',
-                      }}>
+                      <span className={`border px-2 py-0.5 text-[10px] tracking-[0.1em] font-bold ${VERDICT_COLORS[action]}`}>
                         {action}
                       </span>
                     ) : '—'}
                   </td>
-                  <td style={{ ...cell }}>
+                  <td className={cellClass}>
                     {a.verdict_confidence != null ? (() => {
                       const pct = Math.round(a.verdict_confidence * 100)
-                      const barColor = pct >= 70 ? '#4ade80' : pct >= 40 ? '#f5c347' : '#ff6b6b'
+                      const barClass = pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warn' : 'bg-danger'
+                      const textClass = pct >= 70 ? 'text-success' : pct >= 40 ? 'text-warn' : 'text-danger'
                       return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '72px' }}>
-                          <div style={{ flex: 1, height: '3px', background: '#2a2a2a', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '2px' }} />
+                        <div className="flex items-center gap-1.5 min-w-[72px]">
+                          <div className="flex-1 h-[3px] bg-obsidian-outline-var rounded-sm overflow-hidden">
+                            <div className={`h-full rounded-sm ${barClass}`} style={{ width: `${pct}%` }} />
                           </div>
-                          <span style={{ fontSize: '10px', color: barColor, fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>
+                          <span className={`text-[10px] whitespace-nowrap ${textClass}`}>
                             {pct}%
                           </span>
                         </div>
                       )
-                    })() : <span style={{ color: '#555' }}>—</span>}
+                    })() : <span className="text-obsidian-outline">—</span>}
                   </td>
-                  <td style={{ ...cell, color: '#444', fontSize: '11px' }}>
+                  <td className={`${cellClass} text-obsidian-outline text-[11px]`}>
                     {new Date(a.created_at).toLocaleString('es-CO', {
                       dateStyle: 'short', timeStyle: 'short',
                     })}

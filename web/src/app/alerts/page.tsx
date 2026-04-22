@@ -21,9 +21,9 @@ function severity(cvar: number | null, action: VerdictAction | null): AlertRow['
   return 'BAJA'
 }
 
-const SEV_COLOR  = { 'CRÍTICA': '#ff6b6b', 'MEDIA': '#f5c347', 'BAJA': '#4ade80' }
-const SEV_BG     = { 'CRÍTICA': '#1a0808', 'MEDIA': '#141208', 'BAJA': '#081408' }
-const SEV_BORDER = { 'CRÍTICA': '#3a1010', 'MEDIA': '#2a2210', 'BAJA': '#102210' }
+const SEV_TEXT   = { 'CRÍTICA': 'text-danger',  'MEDIA': 'text-warn',    'BAJA': 'text-success' }
+const SEV_BORDER = { 'CRÍTICA': 'border-danger/30', 'MEDIA': 'border-warn/30', 'BAJA': 'border-success/30' }
+const SEV_BG     = { 'CRÍTICA': 'bg-danger/5',  'MEDIA': 'bg-warn/5',    'BAJA': 'bg-success/5' }
 
 export default function AlertsPage() {
   const supabase = createClient()
@@ -72,69 +72,49 @@ export default function AlertsPage() {
   async function generateLinkCode() {
     if (!userId) return
     setGeneratingCode(true)
-
-    // Código criptográficamente seguro — 6 chars alfanuméricos sin ambigüedad
     const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     const bytes = crypto.getRandomValues(new Uint8Array(6))
     const code  = Array.from(bytes).map(b => CHARS[b % CHARS.length]).join('')
-
     const { error } = await supabase.from('telegram_link_codes').insert({ code, user_id: userId })
-
-    if (!error) {
-      setLinkCode(code)
-    }
+    if (!error) setLinkCode(code)
     setGeneratingCode(false)
   }
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace", color: '#444' }}>Cargando...</div>
+      <div className="p-8 font-mono text-obsidian-outline text-[12px]">Cargando...</div>
     )
   }
 
   return (
-    <div style={{ padding: '32px', fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '4px' }}>
+    <div className="p-8 font-mono">
+      <div className="text-primary text-[10px] tracking-[0.28em] mb-1">
         SISTEMA DE ALERTAS
       </div>
-      <h1 style={{ color: '#e0e0e0', fontSize: '20px', fontWeight: '700', marginBottom: '32px' }}>
+      <h1 className="text-obsidian-on text-[20px] font-bold mb-8">
         Alertas y Notificaciones
       </h1>
 
       {/* Telegram Link Card */}
-      <div
-        style={{
-          border: `1px solid ${telegramLinked ? '#1a3a2a' : '#2a2a1a'}`,
-          background: telegramLinked ? '#0d1a12' : '#141208',
-          padding: '24px',
-          marginBottom: '24px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          <span style={{ fontSize: '24px' }}>{telegramLinked ? '✅' : '🔗'}</span>
+      <div className={`border p-6 mb-6 ${telegramLinked ? 'border-success/30 bg-success/5' : 'border-obsidian-outline-var bg-obsidian-low'}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`h-2.5 w-2.5 rounded-full ${telegramLinked ? 'bg-success animate-pulse' : 'bg-obsidian-outline'}`} />
           <div>
-            <div style={{ color: '#e0e0e0', fontSize: '13px', fontWeight: '700' }}>Telegram</div>
-            <div style={{ color: telegramLinked ? '#4ade80' : '#f5c347', fontSize: '10px', letterSpacing: '2px' }}>
+            <div className="text-obsidian-on text-[13px] font-bold">Telegram</div>
+            <div className={`text-[10px] tracking-[0.2em] ${telegramLinked ? 'text-success' : 'text-warn'}`}>
               {telegramLinked ? 'VINCULADO' : 'SIN VINCULAR'}
             </div>
           </div>
         </div>
 
         {telegramLinked ? (
-          <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>
-            Tu cuenta está vinculada. Los análisis del bot se guardarán automáticamente y recibirás alertas en Telegram
-            cuando el riesgo de tus activos supere los umbrales definidos.
+          <p className="text-obsidian-on-var text-[12px] m-0">
+            Tu cuenta está vinculada. Los análisis del bot se guardarán automáticamente y recibirás
+            alertas en Telegram cuando el riesgo de tus activos supere los umbrales definidos.
           </p>
         ) : (
           <>
-            <p style={{ color: '#666', fontSize: '12px', marginBottom: '20px' }}>
+            <p className="text-obsidian-on-var text-[12px] mb-5">
               Vincula tu cuenta para recibir alertas automáticas y sincronizar los análisis del bot con el dashboard.
             </p>
 
@@ -142,67 +122,35 @@ export default function AlertsPage() {
               <button
                 onClick={generateLinkCode}
                 disabled={generatingCode}
-                style={{
-                  background: generatingCode ? '#1a1a1a' : '#f5c347',
-                  color: '#0d0d0f',
-                  border: 'none',
-                  padding: '12px 24px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  letterSpacing: '2px',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  cursor: generatingCode ? 'not-allowed' : 'pointer',
-                }}
+                className="bg-primary text-obsidian-bg px-6 py-3 text-[11px] font-bold tracking-[0.2em] hover:bg-primary-dim transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {generatingCode ? 'GENERANDO...' : 'GENERAR CÓDIGO DE VINCULACIÓN'}
               </button>
             ) : (
               <div>
-                <div style={{ color: '#555', fontSize: '10px', letterSpacing: '2px', marginBottom: '12px' }}>
+                <div className="text-obsidian-outline text-[10px] tracking-[0.2em] mb-3">
                   TU CÓDIGO (válido 15 minutos):
                 </div>
-                <div
-                  style={{
-                    background: '#0d0d0f',
-                    border: '1px solid #57f1db',
-                    padding: '16px 24px',
-                    display: 'inline-block',
-                    color: '#57f1db',
-                    fontSize: '28px',
-                    fontWeight: '700',
-                    letterSpacing: '8px',
-                    marginBottom: '16px',
-                  }}
-                >
-                  {linkCode}
+                <div className="bg-obsidian-bg border border-obsidian-outline-var inline-block px-6 py-4 mb-4">
+                  <span className="text-primary text-[28px] font-bold tracking-[0.5em]">
+                    {linkCode}
+                  </span>
                 </div>
-                <div style={{ color: '#666', fontSize: '11px' }}>
+                <div className="text-obsidian-on-var text-[11px] mb-4">
                   Abre el bot en Telegram:{' '}
                   <a
-                    href='https://t.me/velveteen_stochasto_green_bot'
-                    target='_blank'
-                    style={{ color: '#57f1db', textDecoration: 'none' }}
+                    href="https://t.me/velveteen_stochasto_green_bot"
+                    target="_blank"
+                    className="text-primary no-underline hover:text-primary-dim"
                   >
                     @velveteen_stochasto_green_bot
                   </a>{' '}
-                  y envía: <span style={{ color: '#f5c347' }}>/link {linkCode}</span>
+                  y envía:{' '}
+                  <span className="text-primary">/link {linkCode}</span>
                 </div>
                 <button
-                  onClick={() => {
-                    setLinkCode(null)
-                    checkTelegramStatus()
-                  }}
-                  style={{
-                    marginTop: '16px',
-                    background: 'transparent',
-                    border: '1px solid #333',
-                    color: '#666',
-                    padding: '8px 16px',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    letterSpacing: '1px',
-                  }}
+                  onClick={() => { setLinkCode(null); checkTelegramStatus() }}
+                  className="bg-transparent border border-obsidian-outline-var text-obsidian-on-var px-4 py-2 text-[10px] tracking-[0.1em] hover:border-primary/60 hover:text-primary transition-colors"
                 >
                   YA LO HICE — VERIFICAR
                 </button>
@@ -212,57 +160,57 @@ export default function AlertsPage() {
         )}
       </div>
 
-      {/* Alertas reales */}
-      <div style={{ color: '#f5c347', fontSize: '10px', letterSpacing: '3px', marginBottom: '16px' }}>
+      {/* Alerts feed */}
+      <div className="text-primary text-[10px] tracking-[0.28em] mb-4">
         ALERTAS DE RIESGO · CVaR &gt; 10% ó VENDER
       </div>
 
       {alerts.length === 0 ? (
-        <div style={{ border: '1px solid #1a1a1c', padding: '48px', textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>✅</div>
-          <div style={{ fontSize: '13px', color: '#4ade80', marginBottom: '8px' }}>Sin alertas activas</div>
-          <div style={{ fontSize: '11px', color: '#444' }}>
+        <div className="border border-obsidian-outline-var p-12 text-center">
+          <div className="text-success text-[13px] mb-2">Sin alertas activas</div>
+          <div className="text-obsidian-outline text-[11px]">
             Todos los activos analizados tienen riesgo bajo (CVaR ≤ 10% y veredicto COMPRAR).
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {alerts.map(a => {
-            const col    = SEV_COLOR[a.severity]
-            const bg     = SEV_BG[a.severity]
-            const border = SEV_BORDER[a.severity]
-            return (
-              <div key={a.id} style={{ background: bg, border: `1px solid ${border}`, padding: '16px 20px', display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '20px' }}>
-                {/* Severity pill */}
-                <div style={{ color: col, border: `1px solid ${col}30`, padding: '2px 8px', fontSize: '9px', letterSpacing: '2px', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                  {a.severity}
+        <div className="flex flex-col gap-2.5">
+          {alerts.map(a => (
+            <div
+              key={a.id}
+              className={`border ${SEV_BORDER[a.severity]} ${SEV_BG[a.severity]} px-5 py-4 grid items-center gap-5`}
+              style={{ gridTemplateColumns: 'auto 1fr auto auto' }}
+            >
+              <div className={`border ${SEV_BORDER[a.severity]} ${SEV_TEXT[a.severity]} px-2 py-0.5 text-[9px] tracking-[0.2em] font-bold whitespace-nowrap`}>
+                {a.severity}
+              </div>
+              <div>
+                <div className={`text-[13px] font-bold tracking-wide ${SEV_TEXT[a.severity]}`}>
+                  {a.ticker}
                 </div>
-                {/* Ticker + meta */}
-                <div>
-                  <div style={{ color: '#57f1db', fontSize: '13px', fontWeight: '700', letterSpacing: '1px' }}>{a.ticker}</div>
-                  <div style={{ color: '#444', fontSize: '10px', marginTop: '2px' }}>
-                    {new Date(a.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
-                    {a.climate_beta != null && <span style={{ marginLeft: '12px' }}>β={a.climate_beta.toFixed(1)}</span>}
-                  </div>
-                </div>
-                {/* CVaR */}
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#555', fontSize: '9px', letterSpacing: '1px' }}>CVaR 95%</div>
-                  <div style={{ color: col, fontSize: '14px', fontWeight: '700' }}>
-                    {a.cvar_95 != null ? `${a.cvar_95.toFixed(1)}%` : '—'}
-                  </div>
-                </div>
-                {/* Verdict badge */}
-                <div>
-                  {a.verdict_action ? (
-                    <span style={{ color: col, border: `1px solid ${col}40`, padding: '3px 10px', fontSize: '10px', letterSpacing: '1px', fontWeight: '700' }}>
-                      {a.verdict_action}
-                    </span>
-                  ) : <span style={{ color: '#444' }}>—</span>}
+                <div className="text-obsidian-outline text-[10px] mt-0.5">
+                  {new Date(a.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+                  {a.climate_beta != null && (
+                    <span className="ml-3">β={a.climate_beta.toFixed(1)}</span>
+                  )}
                 </div>
               </div>
-            )
-          })}
+              <div className="text-right">
+                <div className="text-obsidian-outline text-[9px] tracking-[0.1em]">CVaR 95%</div>
+                <div className={`text-[14px] font-bold ${SEV_TEXT[a.severity]}`}>
+                  {a.cvar_95 != null ? `${a.cvar_95.toFixed(1)}%` : '—'}
+                </div>
+              </div>
+              <div>
+                {a.verdict_action ? (
+                  <span className={`border px-2.5 py-1 text-[10px] tracking-[0.1em] font-bold ${SEV_TEXT[a.severity]} ${SEV_BORDER[a.severity]}`}>
+                    {a.verdict_action}
+                  </span>
+                ) : (
+                  <span className="text-obsidian-outline">—</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
